@@ -1,0 +1,408 @@
+[
+  {
+    "title": "Governance & Legal Compliance",
+    "questions": [
+      {
+        "id": "q1",
+        "label": "NGO Registration Certificate"
+      },
+      {
+        "id": "q2",
+        "label": "PAN"
+      },
+      {
+        "id": "q3",
+        "label": "TAN"
+      },
+      {
+        "id": "q4",
+        "label": "12AB Registration"
+      },
+      {
+        "id": "q5",
+        "label": "80G Registration"
+      },
+      {
+        "id": "q6",
+        "label": "Darpan"
+      },
+      {
+        "id": "q7",
+        "label": "CSR-1 Registration"
+      },
+      {
+        "id": "q8",
+        "label": "FCRA Registration"
+      }
+    ]
+  },
+  {
+    "title": "Statutory & Regulatory Compliance",
+    "questions": [
+      {
+        "id": "q9",
+        "label": "Income Tax Return (ITR)"
+      },
+      {
+        "id": "q10",
+        "label": "Annual Audit Report"
+      },
+      {
+        "id": "q11",
+        "label": "Audited Financial Statements"
+      },
+      {
+        "id": "q12",
+        "label": "Annual Activity Report of last three year"
+      },
+      {
+        "id": "q13",
+        "label": "Filing under Societies/Trusts/Section 8 Act"
+      }
+    ]
+  },
+  {
+    "title": "Financial Systems",
+    "questions": [
+      {
+        "id": "q14",
+        "label": "Accounting Manual"
+      },
+      {
+        "id": "q15",
+        "label": "Finance Policy"
+      },
+      {
+        "id": "q16",
+        "label": "Procurement Policy"
+      },
+      {
+        "id": "q17",
+        "label": "Delegation of Financial Authority"
+      },
+      {
+        "id": "q18",
+        "label": "Budgeting System"
+      },
+      {
+        "id": "q19",
+        "label": "Internal Financial Controls"
+      },
+      {
+        "id": "q20",
+        "label": "Asset Register"
+      },
+      {
+        "id": "q21",
+        "label": "Inventory Register"
+      },
+      {
+        "id": "q22",
+        "label": "Statutory Registers"
+      },
+      {
+        "id": "q23",
+        "label": "Bank Reconciliation System"
+      },
+      {
+        "id": "q24",
+        "label": "Fixed Asset Verification"
+      },
+      {
+        "id": "q25",
+        "label": "Annual External Audit"
+      }
+    ]
+  },
+  {
+    "title": "Governance Documents",
+    "questions": [
+      {
+        "id": "q26",
+        "label": "Memorandum of Association / Trust Deed"
+      },
+      {
+        "id": "q27",
+        "label": "Rules & Regulations / Articles of Association"
+      },
+      {
+        "id": "q28",
+        "label": "Board Charter"
+      },
+      {
+        "id": "q29",
+        "label": "Board Meeting Minutes"
+      },
+      {
+        "id": "q30",
+        "label": "General Body Meeting Minutes"
+      },
+      {
+        "id": "q31",
+        "label": "Conflict of Interest Policy"
+      },
+      {
+        "id": "q32",
+        "label": "Code of Conduct"
+      },
+      {
+        "id": "q33",
+        "label": "Whistleblower Policy"
+      },
+      {
+        "id": "q34",
+        "label": "Risk Management Policy"
+      },
+      {
+        "id": "q35",
+        "label": "Anti-Fraud Policy"
+      },
+      {
+        "id": "q36",
+        "label": "Anti-Bribery & Anti-Corruption Policy"
+      }
+    ]
+  },
+  {
+    "title": "Human Resource Compliance",
+    "questions": [
+      {
+        "id": "q37",
+        "label": "HR Policy Manual"
+      },
+      {
+        "id": "q38",
+        "label": "Recruitment Policy"
+      },
+      {
+        "id": "q39",
+        "label": "Employee Handbook"
+      },
+      {
+        "id": "q40",
+        "label": "Employment Contracts"
+      },
+      {
+        "id": "q41",
+        "label": "Performance Appraisal System"
+      },
+      {
+        "id": "q42",
+        "label": "Leave Policy"
+      },
+      {
+        "id": "q43",
+        "label": "Travel Policy"
+      },
+      {
+        "id": "q44",
+        "label": "Grievance Redressal Policy"
+      },
+      {
+        "id": "q45",
+        "label": "POSH Policy"
+      },
+      {
+        "id": "q46",
+        "label": "Child Protection Policy"
+      },
+      {
+        "id": "q47",
+        "label": "Safeguarding Policy"
+      },
+      {
+        "id": "q48",
+        "label": "Equal Opportunity Policy"
+      },
+      {
+        "id": "q49",
+        "label": "Diversity, Equity & Inclusion Policy"
+      }
+    ]
+  },
+  {
+    "title": "Programme Compliance",
+    "questions": [
+      {
+        "id": "q50",
+        "label": "Monitoring & Evaluation Framework"
+      },
+      {
+        "id": "q51",
+        "label": "Theory of Change"
+      },
+      {
+        "id": "q52",
+        "label": "Data Collection Protocols"
+      },
+      {
+        "id": "q53",
+        "label": "Beneficiary Consent Forms"
+      },
+      {
+        "id": "q54",
+        "label": "Programme Documentation System"
+      },
+      {
+        "id": "q55",
+        "label": "Impact Measurement Framework"
+      },
+      {
+        "id": "q56",
+        "label": "Complaint & Feedback Mechanism"
+      },
+      {
+        "id": "q57",
+        "label": "Community Safeguarding Procedures"
+      }
+    ]
+  },
+  {
+    "title": "Data & IT Compliance",
+    "questions": [
+      {
+        "id": "q58",
+        "label": "Data Protection Policy"
+      },
+      {
+        "id": "q59",
+        "label": "Privacy Policy"
+      },
+      {
+        "id": "q60",
+        "label": "Information Security Policy"
+      },
+      {
+        "id": "q61",
+        "label": "Cyber Security Practices"
+      },
+      {
+        "id": "q62",
+        "label": "Data Backup System"
+      },
+      {
+        "id": "q63",
+        "label": "Document Retention Policy"
+      },
+      {
+        "id": "q64",
+        "label": "IT Acceptable Use Policy"
+      }
+    ]
+  },
+  {
+    "title": "Communication & Transparency",
+    "questions": [
+      {
+        "id": "q65",
+        "label": "Functional Website"
+      },
+      {
+        "id": "q66",
+        "label": "Audited Financial Statements on Website"
+      },
+      {
+        "id": "q67",
+        "label": "Board Member Details"
+      },
+      {
+        "id": "q68",
+        "label": "Key Staff Details"
+      },
+      {
+        "id": "q69",
+        "label": "Impact Stories"
+      },
+      {
+        "id": "q70",
+        "label": "Organization Profile/Brochure"
+      },
+      {
+        "id": "q71",
+        "label": "Corporate Presentation (Pitch Deck)"
+      },
+      {
+        "id": "q72",
+        "label": "Monthly Newsletter"
+      },
+      {
+        "id": "q73",
+        "label": "Social Media Presence"
+      },
+      {
+        "id": "q74",
+        "label": "Branding Guidelines"
+      },
+      {
+        "id": "q75",
+        "label": "Branding material"
+      }
+    ]
+  },
+  {
+    "title": "Due Diligence Readiness",
+    "questions": [
+      {
+        "id": "q76",
+        "label": "Due Diligence Folder"
+      },
+      {
+        "id": "q77",
+        "label": "Board KYC Documents"
+      },
+      {
+        "id": "q78",
+        "label": "Key Staff CVs"
+      },
+      {
+        "id": "q79",
+        "label": "Strategic Plan"
+      },
+      {
+        "id": "q80",
+        "label": "Annual Budget"
+      },
+      {
+        "id": "q81",
+        "label": "Organogram"
+      },
+      {
+        "id": "q82",
+        "label": "References from Donors/Partners"
+      },
+      {
+        "id": "q83",
+        "label": "Monitoring & Evaluation Reports"
+      },
+      {
+        "id": "q84",
+        "label": "Bank Details & Cancelled Cheque"
+      }
+    ]
+  },
+  {
+    "title": "International Donor Expectations",
+    "questions": [
+      {
+        "id": "q85",
+        "label": "Anti-Terror Financing Declaration"
+      },
+      {
+        "id": "q86",
+        "label": "Anti-Money Laundering (AML) Policy"
+      },
+      {
+        "id": "q87",
+        "label": "Fraud Reporting Mechanism"
+      },
+      {
+        "id": "q88",
+        "label": "Ethical Fundraising Policy"
+      },
+      {
+        "id": "q89",
+        "label": "Gift & Hospitality Policy"
+      }
+    ]
+  }
+]
