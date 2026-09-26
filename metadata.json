@@ -1,0 +1,7 @@
+{
+  "name": "NGO Compass Funding Ready",
+  "description": "Find funding readiness gaps and receive an expert-reviewed roadmap for stronger NGO funding applications.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -37,19 +37,56 @@
   const answerLabel = (answer) => answer === "yes" ? "Yes" : answer === "no" ? "No" : answer === "not_sure" ? "Not sure" : answer === "not_applicable" ? "Not applicable" : "Not answered";
   const saveLocal = () => { localStorage.setItem(draftStorageKey, JSON.stringify(draft)); if (token) { localStorage.setItem(assessmentStorageKey, JSON.stringify(token)); if (!saving) { clearTimeout(remoteSaveTimer); remoteSaveTimer = window.setTimeout(() => saveRemote(draft, token, true).catch(() => { status = "Offline — your local progress is safe."; }), 900); } } };
 
+  function getCsrfCookie() {
+    try {
+      const match = document.cookie.match(/(?:^|;\s*)ngo_compass_csrf=([^;]+)/);
+      return match ? decodeURIComponent(match[1]) : "";
+    } catch {
+      return "";
+    }
+  }
+
   async function request(payload, method = "POST") {
+    if (!csrfToken) {
+      csrfToken = getCsrfCookie();
+    }
     const options = { method, credentials: "same-origin", headers: { "content-type": "application/json" } };
-    if (method !== "GET") { options.headers["x-csrf-token"] = csrfToken; options.body = JSON.stringify(payload); }
-    const response = await fetch(method === "GET" && payload ? `${apiUrl}?${new URLSearchParams(payload)}` : apiUrl, options);
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) { const error = new Error(data.error || "We could not save your progress."); error.status = response.status; throw error; }
+    if (method !== "GET") {
+      if (csrfToken) options.headers["x-csrf-token"] = csrfToken;
+      options.body = JSON.stringify({ ...payload, csrfToken: csrfToken || payload.csrfToken });
+    }
+    let response = await fetch(method === "GET" && payload ? `${apiUrl}?${new URLSearchParams(payload)}` : apiUrl, options);
+    let data = await response.json().catch(() => ({}));
+    if (response.status === 403 && method !== "GET") {
+      try {
+        await bootstrap();
+        if (csrfToken) {
+          options.headers["x-csrf-token"] = csrfToken;
+          options.body = JSON.stringify({ ...payload, csrfToken });
+          response = await fetch(apiUrl, options);
+          data = await response.json().catch(() => ({}));
+        }
+      } catch {}
+    }
+    if (data && data.csrfToken) {
+      csrfToken = data.csrfToken;
+    }
+    const newCsrf = response.headers.get("x-csrf-token");
+    if (newCsrf) {
+      csrfToken = newCsrf;
+    }
+    if (!response.ok) {
+      const error = new Error(data.error || "We could not save your progress.");
+      error.status = response.status;
+      throw error;
+    }
     return data;
   }
 
   async function bootstrap() {
     const data = await request({ action: "bootstrap" }, "GET");
     settings = data.settings || null;
-    csrfToken = data.csrfToken || "";
+    csrfToken = data.csrfToken || getCsrfCookie() || "";
     orderReference = data.orderReference || settings?.orderReference || "";
   }
 
@@ -95,9 +132,70 @@
   function bindAssessment() { document.querySelector("[data-continue]")?.addEventListener("click", () => void forward()); document.querySelector("[data-submit]")?.addEventListener("click", () => void forward()); document.querySelectorAll("[data-answer]").forEach((button) => button.addEventListener("click", () => void forward(button.dataset.answer))); document.querySelector("[data-back]")?.addEventListener("click", () => { if (!saving) { draft.currentStep = Math.max(0, draft.currentStep - 1); error = ""; renderAssessment(); } }); document.querySelector("[data-restart]")?.addEventListener("click", () => { if (!saving) { localStorage.removeItem(assessmentStorageKey); localStorage.removeItem(draftStorageKey); token = null; draft = emptyDraft(); status = "Your progress is saved on this device."; renderAssessment(); } }); const input = document.querySelector("#answer"); input?.focus(); input?.addEventListener("input", () => { draft.profile[fieldForStep()?.[0]] = input.value; saveLocal(); }); input?.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); void forward(); } }); }
   async function restoreAssessment() { try { const storedDraft = JSON.parse(localStorage.getItem(draftStorageKey) || "null"); if (storedDraft?.profile && storedDraft.answers) draft = storedDraft; token = JSON.parse(localStorage.getItem(assessmentStorageKey) || "null"); if (!token?.id || !token?.respondentKey) { token = null; return; } const access = await fetch(`${apiUrl}?action=access`, { credentials: "same-origin" }); if (!access.ok) { if (access.status === 403) location.assign(`${appRoot || "/"}payment/`); return; } const data = await request({ action: "load", id: token.id, key: token.respondentKey }, "GET"); draft = data.assessment; status = draft.completed ? "Assessment submitted." : "Your saved assessment is ready to continue."; } catch (caught) { if (caught.status === 403) location.assign(`${appRoot || "/"}payment/`); else status = "We couldn’t reach the server. Your local progress is safe; try Continue again when you’re online."; } }
   function renderPrivacy() { root().outerHTML = `<main class="simple-page"><section class="simple-card"><a class="assessment-brand" href="./"><img src="./ngo-compass-logo.png" alt="NGO Compass"></a><p class="eyebrow">Privacy note</p><h1>Your information, used responsibly.</h1><p>We collect the details you submit to verify your payment, provide access to the funding-readiness assessment and prepare your report.</p><div class="simple-copy"><h2>What we collect</h2><p>Your name, NGO name, email address, phone number, payment reference and any optional payment proof you choose to upload.</p><h2>How we use it</h2><p>Our team uses this information to match your payment, manage assessment access, review your answers and contact you about the report or support request.</p><h2>How long we keep it</h2><p>We retain submitted information for operational, accounting and support purposes. You can request access, correction or deletion by contacting our support team on WhatsApp.</p><h2>Questions</h2><p>For privacy or payment questions, <a class="text-link" href="${supportUrl}" target="_blank" rel="noreferrer">contact us on WhatsApp</a>.</p></div><a class="back-button simple-back" href="./payment/">Back to payment</a></section></main>`; }
-  function normalizeNestedLinks() { document.querySelectorAll('a[href="./"]').forEach((link) => { link.setAttribute("href", homeHref); }); document.querySelectorAll('a[href="./privacy/"]').forEach((link) => { link.setAttribute("href", `${appRoot}privacy/`); }); document.querySelectorAll('a[href="./payment/"]').forEach((link) => { link.setAttribute("href", `${appRoot}payment/`); }); }
+  function normalizeNestedLinks() { document.querySelectorAll('a[href="./"]').forEach((link) => { link.setAttribute("href", homeHref); }); document.querySelectorAll('a[href="./privacy/"]').forEach((link) => { link.setAttribute("href", `${appRoot}privacy/`); }); document.querySelectorAll('a[href="./payment/"]').forEach((link) => { link.setAttribute("href", `${appRoot}payment/`); }); document.querySelectorAll('a[href="./admin"]').forEach((link) => { link.setAttribute("href", `${appRoot}admin`); }); }
   function setupLanding() { if (matchMedia("(prefers-reduced-motion: reduce)").matches) return; const elements = [...document.querySelectorAll("[data-reveal]")]; if (!elements.length) return; document.documentElement.classList.add("reveal-ready"); const observer = new IntersectionObserver((entries) => entries.forEach((entry) => { if (entry.isIntersecting) { entry.target.classList.add("is-visible"); observer.unobserve(entry.target); } }), { rootMargin: "0px 0px -8%", threshold: 0.08 }); elements.forEach((element) => observer.observe(element)); }
-  async function boot() { if (isPayment()) { try { await bootstrap(); } catch { settings = null; } renderPayment(); normalizeNestedLinks(); return; } if (isAssessment()) { const access = await fetch(`${apiUrl}?action=access`, { credentials: "same-origin" }).catch(() => null); if (!access?.ok) { location.assign(`${appRoot || "/"}payment/`); return; } await restoreAssessment(); renderAssessment(); normalizeNestedLinks(); return; } if (isPrivacy()) { renderPrivacy(); normalizeNestedLinks(); return; } setupLanding(); }
+  let initialLandingHtml = "";
+  if (!isPayment() && !isAssessment() && !isPrivacy()) {
+    initialLandingHtml = root().innerHTML;
+  }
+  async function boot() {
+    if (isPayment()) {
+      try { await bootstrap(); } catch { settings = null; }
+      renderPayment();
+      normalizeNestedLinks();
+      return;
+    }
+    if (isAssessment()) {
+      try { await bootstrap(); } catch {}
+      const access = await fetch(`${apiUrl}?action=access`, { credentials: "same-origin" }).catch(() => null);
+      if (!access?.ok) { location.assign(`${appRoot || "/"}payment/`); return; }
+      await restoreAssessment();
+      renderAssessment();
+      normalizeNestedLinks();
+      return;
+    }
+    if (isPrivacy()) {
+      renderPrivacy();
+      normalizeNestedLinks();
+      return;
+    }
+    if (initialLandingHtml && (root().classList.contains("payment-page") || root().classList.contains("assessment-page") || root().classList.contains("simple-page"))) {
+      root().className = "";
+      root().innerHTML = initialLandingHtml;
+      normalizeNestedLinks();
+    }
+    setupLanding();
+  }
+  document.addEventListener("click", (event) => {
+    const anchor = event.target.closest("a");
+    if (!anchor) return;
+    const href = anchor.getAttribute("href");
+    if (!href) return;
+    if (
+      anchor.target === "_blank" ||
+      href.startsWith("http://") ||
+      href.startsWith("https://") ||
+      href.startsWith("mailto:") ||
+      href.startsWith("tel:") ||
+      href.startsWith("whatsapp:") ||
+      anchor.hasAttribute("download") ||
+      href.includes("/admin") ||
+      href.endsWith("admin")
+    ) {
+      return;
+    }
+    event.preventDefault();
+    try {
+      const targetUrl = new URL(anchor.href, location.href);
+      if (targetUrl.href !== location.href) {
+        history.pushState({}, "", targetUrl.href);
+      }
+      window.scrollTo(0, 0);
+      void boot();
+    } catch {
+      location.assign(anchor.href);
+    }
+  });
   addEventListener("popstate", boot);
   boot();
 })();
