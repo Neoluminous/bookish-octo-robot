@@ -18,15 +18,17 @@ function adminSession(): bool {
 function requireAdmin(): void { if (!adminSession()) fail('Admin sign-in required.', 403); }
 function adminRedirect(): never { header('Location: /FundingReady/admin', true, 303); exit; }
 function issueLink(array &$payment): string {
-    foreach (glob(storage('access/token-*.json')) ?: [] as $path) {
-        $hash = substr(basename($path), 6, -5);
-        if (!preg_match('/^[a-f0-9]{64}$/D', $hash)) continue;
-        locked('access-' . $hash, function () use ($path, $payment) {
-            $record = readJson($path);
-            if (!$record || ($record['paymentId'] ?? '') !== $payment['id'] || ($record['usedAt'] ?? '') !== '') return;
-            $record['revokedAt'] = now();
-            if (!writeJson($path, $record)) fail('Unable to revoke the prior access link.', 500);
-        });
+    foreach (['token' => 'access-', 'slug' => 'slug-'] as $kind => $lockPrefix) {
+        foreach (glob(storage('access/' . $kind . '-*.json')) ?: [] as $path) {
+            $hash = substr(basename($path), strlen($kind) + 1, -5);
+            if (!preg_match('/^[a-f0-9]{64}$/D', $hash)) continue;
+            locked($lockPrefix . $hash, function () use ($path, $payment) {
+                $record = readJson($path);
+                if (!$record || ($record['paymentId'] ?? '') !== $payment['id'] || ($record['usedAt'] ?? '') !== '') return;
+                $record['revokedAt'] = now();
+                if (!writeJson($path, $record)) fail('Unable to revoke the prior access link.', 500);
+            });
+        }
     }
     $new = token(); $payment['accessHash'] = digest($new);
     if (!writeJson(storage('access/token-' . $payment['accessHash'] . '.json'), ['paymentId'=>$payment['id'],'createdAt'=>now(),'expiresAt'=>gmdate('c',time()+604800),'usedAt'=>'','revokedAt'=>''])) fail('Unable to issue access.', 500);

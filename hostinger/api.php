@@ -36,6 +36,25 @@ if ($method === 'GET' && $action === 'exchange') {
     if ($result === null) { header('Location: /FundingReady/payment/?access=invalid', true, 303); exit; }
     appCookie('ngo_compass_access', $result, 2592000); header('Location: /FundingReady/assessment/', true, 303); exit;
 }
+if ($method === 'GET' && $action === 'exchange-slug') {
+    $slug = $_GET['slug'] ?? null;
+    if (!is_string($slug) || !preg_match('/^[a-z0-9][a-z0-9-]{2,63}$/D', $slug)) { header('Location: /FundingReady/payment/?access=invalid', true, 303); exit; }
+    $hash = digest($slug);
+    $session = locked('slug-' . $hash, function () use ($hash) {
+        $path = storage('access/slug-' . $hash . '.json'); $record = readJson($path);
+        if (!$record || ($record['usedAt'] ?? '') !== '' || ($record['revokedAt'] ?? '') !== '' || strtotime((string) ($record['expiresAt'] ?? '')) <= time()) return null;
+        $paymentId = $record['paymentId'] ?? '';
+        $payment = validId($paymentId) ? readJson(paymentFile($paymentId)) : null;
+        if (!$payment || ($payment['status'] ?? '') !== 'verified') return null;
+        $new = token(); $sessionPath = storage('sessions/session-' . digest($new) . '.json');
+        if (!writeJson($sessionPath, ['paymentId'=>$paymentId,'createdAt'=>now(),'expiresAt'=>gmdate('c',time()+2592000)])) fail('Unable to activate assessment access.', 500);
+        $record['usedAt'] = now();
+        if (!writeJson($path, $record)) { @unlink($sessionPath); fail('Unable to activate assessment access.', 500); }
+        return $new;
+    });
+    if ($session === null) { header('Location: /FundingReady/payment/?access=invalid', true, 303); exit; }
+    appCookie('ngo_compass_access', $session, 2592000); header('Location: /FundingReady/assessment/', true, 303); exit;
+}
 if ($method === 'GET' && $action === 'payment-status') {
     $reference = $_GET['reference'] ?? '';
     if (!is_string($reference) || !preg_match('/^NGR-\d{8}-[A-F0-9]{10}$/D', $reference)) fail('Payment not found.', 404);
