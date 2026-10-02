@@ -1,0 +1,23 @@
+DirectoryIndex index.html
+Options -Indexes
+RewriteEngine On
+RewriteRule ^(?:common|questions)\.php$ - [F,L]
+RewriteRule ^admin/?$ admin.php [L,QSA]
+RewriteRule ^admin/(proof|report)/([a-f0-9]{32,40})/?$ admin.php?resource=$1&id=$2 [L,QSA]
+RewriteRule ^api/payments/status/?$ api.php?action=payment-status [L,QSA]
+RewriteRule ^api/assessments/([a-f0-9]{32,40})/report/?$ api.php?action=report&id=$1 [L,QSA]
+RewriteRule ^api/assessments/([a-f0-9]{32,40})/?$ api.php?action=reset&id=$1 [L,QSA]
+RewriteRule ^access/([A-Za-z0-9_-]{30,128})/?$ api.php?action=exchange&token=$1 [L,QSA]
+RewriteRule ^api/?$ api.php [L,QSA]
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+RewriteRule ^.*$ index.html [L]
+
+<FilesMatch "^(common\.php|questions\.json)$">
+  Require all denied
+</FilesMatch>
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "same-origin"
+</IfModule>
