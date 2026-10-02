@@ -4,35 +4,59 @@
     "questions": [
       {
         "id": "q1",
-        "label": "NGO Registration Certificate"
+        "num": 6,
+        "prompt": "Does your NGO have an NGO Registration Certificate (Trust / Society / Section 8 License)?",
+        "label": "NGO Registration Certificate (Trust / Society / Section 8 License)",
+        "driveItem": "NGO Registration Certificate"
       },
       {
         "id": "q2",
-        "label": "PAN"
+        "num": 7,
+        "prompt": "Does your NGO have a Permanent Account Number (PAN) Card?",
+        "label": "Permanent Account Number (PAN) Card",
+        "driveItem": "NGO PAN Card"
       },
       {
         "id": "q3",
-        "label": "TAN"
+        "num": 8,
+        "prompt": "Does your NGO have a Tax Deduction and Collection Account Number (TAN)?",
+        "label": "Tax Deduction and Collection Account Number (TAN)",
+        "driveItem": "TAN Registration Letter / Certificate"
       },
       {
         "id": "q4",
-        "label": "12AB Registration"
+        "num": 9,
+        "prompt": "Does your NGO have a valid 12AB Registration Certificate?",
+        "label": "12AB Registration Certificate",
+        "driveItem": "12AB Registration Certificate (Form 10AC / 10AD)"
       },
       {
         "id": "q5",
-        "label": "80G Registration"
+        "num": 10,
+        "prompt": "Does your NGO have a valid 80G Registration Certificate?",
+        "label": "80G Registration Certificate",
+        "driveItem": "80G Registration Certificate (Form 10AC / 10AD)"
       },
       {
         "id": "q6",
-        "label": "Darpan"
+        "num": 11,
+        "prompt": "Is your NGO registered on the NITI Aayog NGO Darpan portal (Unique ID)?",
+        "label": "NITI Aayog NGO Darpan Registration (Unique ID)",
+        "driveItem": "NGO Darpan Registration Certificate / Portal Profile PDF"
       },
       {
         "id": "q7",
-        "label": "CSR-1 Registration"
+        "num": 12,
+        "prompt": "Does your NGO have a valid MCA CSR-1 Registration?",
+        "label": "MCA CSR-1 Registration",
+        "driveItem": "CSR-1 Registration Approval Letter"
       },
       {
         "id": "q8",
-        "label": "FCRA Registration"
+        "num": 13,
+        "prompt": "Does your NGO have a valid FCRA Registration Certificate?",
+        "label": "FCRA Registration Certificate",
+        "driveItem": "FCRA Registration / Renewal Certificate"
       }
     ]
   },
@@ -41,23 +65,38 @@
     "questions": [
       {
         "id": "q9",
-        "label": "Income Tax Return (ITR)"
+        "num": 14,
+        "prompt": "Has your NGO filed Income Tax Returns (ITR-7) for the last three financial years?",
+        "label": "Income Tax Returns (ITR-7 - Last 3 Years)",
+        "driveItem": "Income Tax Return (ITR) Acknowledgements (Last 3 Years)"
       },
       {
         "id": "q10",
-        "label": "Annual Audit Report"
+        "num": 15,
+        "prompt": "Does your NGO have Annual Audit Reports (Form 10B / 10BB) for the last three financial years?",
+        "label": "Annual Audit Reports (Form 10B / 10BB - Last 3 Years)",
+        "driveItem": "Annual Audit Reports (Form 10B / 10BB - Last 3 Years)"
       },
       {
         "id": "q11",
-        "label": "Audited Financial Statements"
+        "num": 16,
+        "prompt": "Does your NGO have Audited Financial Statements (Balance Sheet, Income & Expenditure, Receipts & Payments) for the last three financial years?",
+        "label": "Audited Financial Statements (Last 3 Years)",
+        "driveItem": "Audited Financial Statements (Last 3 Years)"
       },
       {
         "id": "q12",
-        "label": "Annual Activity Report of last three year"
+        "num": 17,
+        "prompt": "Does your NGO have Annual Activity Reports for the last three years?",
+        "label": "Annual Activity Reports (Last 3 Years)",
+        "driveItem": "Annual Activity Reports (Last 3 Years)"
       },
       {
         "id": "q13",
-        "label": "Filing under Societies/Trusts/Section 8 Act"
+        "num": 18,
+        "prompt": "Has your NGO completed its annual statutory filings under the Societies / Trusts / Companies (Section 8) Act?",
+        "label": "Annual Statutory Filings (Societies / Trusts / Section 8 Act)",
+        "driveItem": "Proof of Annual Statutory Filings (Charity Commissioner / Registrar of Societies / MCA ROC)"
       }
     ]
   },
@@ -66,51 +105,87 @@
     "questions": [
       {
         "id": "q14",
-        "label": "Accounting Manual"
+        "num": 19,
+        "prompt": "Does your NGO have a documented Accounting Manual?",
+        "label": "Accounting Manual",
+        "driveItem": "Accounting Manual"
       },
       {
         "id": "q15",
-        "label": "Finance Policy"
+        "num": 20,
+        "prompt": "Does your NGO have a documented Finance Policy?",
+        "label": "Finance Policy",
+        "driveItem": "Finance Policy"
       },
       {
         "id": "q16",
-        "label": "Procurement Policy"
+        "num": 21,
+        "prompt": "Does your NGO have a documented Procurement Policy?",
+        "label": "Procurement Policy",
+        "driveItem": "Procurement Policy"
       },
       {
         "id": "q17",
-        "label": "Delegation of Financial Authority"
+        "num": 22,
+        "prompt": "Does your NGO have a Delegation of Financial Authority matrix/policy?",
+        "label": "Delegation of Financial Authority Matrix / Policy",
+        "driveItem": "Delegation of Financial Authority Matrix / Document"
       },
       {
         "id": "q18",
-        "label": "Budgeting System"
+        "num": 23,
+        "prompt": "Does your NGO have a formal Budgeting System?",
+        "label": "Budgeting System",
+        "driveItem": null
       },
       {
         "id": "q19",
-        "label": "Internal Financial Controls"
+        "num": 24,
+        "prompt": "Does your NGO have documented Internal Financial Controls?",
+        "label": "Internal Financial Controls",
+        "driveItem": "Internal Financial Controls Document / SOP"
       },
       {
         "id": "q20",
-        "label": "Asset Register"
+        "num": 25,
+        "prompt": "Does your NGO maintain a Fixed Asset Register?",
+        "label": "Fixed Asset Register",
+        "driveItem": "Fixed Asset Register (Latest Copy)"
       },
       {
         "id": "q21",
-        "label": "Inventory Register"
+        "num": 26,
+        "prompt": "Does your NGO maintain an Inventory Register?",
+        "label": "Inventory Register",
+        "driveItem": "Inventory Register (Latest Copy)"
       },
       {
         "id": "q22",
-        "label": "Statutory Registers"
+        "num": 27,
+        "prompt": "Does your NGO maintain updated Statutory Registers?",
+        "label": "Statutory Registers",
+        "driveItem": "Statutory Registers (Sample / Index Copy)"
       },
       {
         "id": "q23",
-        "label": "Bank Reconciliation System"
+        "num": 28,
+        "prompt": "Does your NGO perform regular Bank Reconciliations?",
+        "label": "Bank Reconciliation System",
+        "driveItem": "Latest Bank Reconciliation Statement (BRS)"
       },
       {
         "id": "q24",
-        "label": "Fixed Asset Verification"
+        "num": 29,
+        "prompt": "Does your NGO conduct periodic physical verification of fixed assets?",
+        "label": "Fixed Asset Physical Verification",
+        "driveItem": "Latest Fixed Asset Physical Verification Report"
       },
       {
         "id": "q25",
-        "label": "Annual External Audit"
+        "num": 30,
+        "prompt": "Does your NGO undergo an Annual External Statutory Audit?",
+        "label": "Annual External Statutory Audit",
+        "driveItem": "External Auditor Appointment Letter / Latest Management Letter"
       }
     ]
   },
@@ -119,47 +194,80 @@
     "questions": [
       {
         "id": "q26",
-        "label": "Memorandum of Association / Trust Deed"
+        "num": 31,
+        "prompt": "Does your NGO have a registered Memorandum of Association (MoA) or Trust Deed?",
+        "label": "Memorandum of Association (MoA) / Trust Deed",
+        "driveItem": "Memorandum of Association (MoA) / Registered Trust Deed"
       },
       {
         "id": "q27",
-        "label": "Rules & Regulations / Articles of Association"
+        "num": 32,
+        "prompt": "Does your NGO have registered Rules & Regulations or Articles of Association (AoA)?",
+        "label": "Rules & Regulations / Articles of Association (AoA)",
+        "driveItem": "Rules & Regulations / Articles of Association (AoA)"
       },
       {
         "id": "q28",
-        "label": "Board Charter"
+        "num": 33,
+        "prompt": "Does your NGO have a documented Board Charter?",
+        "label": "Board Charter",
+        "driveItem": "Board Charter"
       },
       {
         "id": "q29",
-        "label": "Board Meeting Minutes"
+        "num": 34,
+        "prompt": "Does your NGO maintain signed Board Meeting Minutes?",
+        "label": "Board Meeting Minutes",
+        "driveItem": "Board Meeting Minutes (Last 3 Meetings)"
       },
       {
         "id": "q30",
-        "label": "General Body Meeting Minutes"
+        "num": 35,
+        "prompt": "Does your NGO maintain signed Annual General Body Meeting (AGM) Minutes?",
+        "label": "General Body Meeting (AGM) Minutes",
+        "driveItem": "General Body Meeting (AGM) Minutes (Latest)"
       },
       {
         "id": "q31",
-        "label": "Conflict of Interest Policy"
+        "num": 36,
+        "prompt": "Does your NGO have a Conflict of Interest Policy?",
+        "label": "Conflict of Interest Policy",
+        "driveItem": "Conflict of Interest Policy"
       },
       {
         "id": "q32",
-        "label": "Code of Conduct"
+        "num": 37,
+        "prompt": "Does your NGO have a Code of Conduct for Board and Staff?",
+        "label": "Code of Conduct for Board and Staff",
+        "driveItem": "Code of Conduct Policy"
       },
       {
         "id": "q33",
-        "label": "Whistleblower Policy"
+        "num": 38,
+        "prompt": "Does your NGO have a Whistleblower Policy?",
+        "label": "Whistleblower Policy",
+        "driveItem": "Whistleblower Policy"
       },
       {
         "id": "q34",
-        "label": "Risk Management Policy"
+        "num": 39,
+        "prompt": "Does your NGO have a Risk Management Policy?",
+        "label": "Risk Management Policy",
+        "driveItem": "Risk Management Policy"
       },
       {
         "id": "q35",
-        "label": "Anti-Fraud Policy"
+        "num": 40,
+        "prompt": "Does your NGO have an Anti-Fraud Policy?",
+        "label": "Anti-Fraud Policy",
+        "driveItem": "Anti-Fraud Policy"
       },
       {
         "id": "q36",
-        "label": "Anti-Bribery & Anti-Corruption Policy"
+        "num": 41,
+        "prompt": "Does your NGO have an Anti-Bribery & Anti-Corruption Policy?",
+        "label": "Anti-Bribery & Anti-Corruption Policy",
+        "driveItem": "Anti-Bribery & Anti-Corruption Policy"
       }
     ]
   },
@@ -168,55 +276,94 @@
     "questions": [
       {
         "id": "q37",
-        "label": "HR Policy Manual"
+        "num": 42,
+        "prompt": "Does your NGO have an HR Policy Manual?",
+        "label": "HR Policy Manual",
+        "driveItem": "HR Policy Manual"
       },
       {
         "id": "q38",
-        "label": "Recruitment Policy"
+        "num": 43,
+        "prompt": "Does your NGO have a documented Recruitment Policy?",
+        "label": "Recruitment Policy",
+        "driveItem": "Recruitment Policy"
       },
       {
         "id": "q39",
-        "label": "Employee Handbook"
+        "num": 44,
+        "prompt": "Does your NGO have an Employee Handbook?",
+        "label": "Employee Handbook",
+        "driveItem": "Employee Handbook"
       },
       {
         "id": "q40",
-        "label": "Employment Contracts"
+        "num": 45,
+        "prompt": "Does your NGO issue formal Employment Contracts to all staff?",
+        "label": "Employment Contracts for Staff",
+        "driveItem": "Standard Employment Contract Template"
       },
       {
         "id": "q41",
-        "label": "Performance Appraisal System"
+        "num": 46,
+        "prompt": "Does your NGO have a formal Performance Appraisal System?",
+        "label": "Performance Appraisal System",
+        "driveItem": "Performance Appraisal Policy / Evaluation Form Template"
       },
       {
         "id": "q42",
-        "label": "Leave Policy"
+        "num": 47,
+        "prompt": "Does your NGO have a documented Leave Policy?",
+        "label": "Leave Policy",
+        "driveItem": "Leave Policy"
       },
       {
         "id": "q43",
-        "label": "Travel Policy"
+        "num": 48,
+        "prompt": "Does your NGO have a documented Travel & Reimbursement Policy?",
+        "label": "Travel & Reimbursement Policy",
+        "driveItem": "Travel & Reimbursement Policy"
       },
       {
         "id": "q44",
-        "label": "Grievance Redressal Policy"
+        "num": 49,
+        "prompt": "Does your NGO have an Employee Grievance Redressal Policy?",
+        "label": "Grievance Redressal Policy",
+        "driveItem": "Grievance Redressal Policy"
       },
       {
         "id": "q45",
-        "label": "POSH Policy"
+        "num": 50,
+        "prompt": "Does your NGO have a POSH (Prevention of Sexual Harassment) Policy and Internal Committee?",
+        "label": "POSH Policy and Internal Committee",
+        "driveItem": "POSH Policy & Internal Committee (IC) Constitution Order"
       },
       {
         "id": "q46",
-        "label": "Child Protection Policy"
+        "num": 51,
+        "prompt": "Does your NGO have a Child Protection Policy?",
+        "label": "Child Protection Policy",
+        "driveItem": "Child Protection Policy"
       },
       {
         "id": "q47",
-        "label": "Safeguarding Policy"
+        "num": 52,
+        "prompt": "Does your NGO have a Safeguarding Policy for vulnerable adults and communities?",
+        "label": "Safeguarding Policy",
+        "driveItem": "Safeguarding Policy"
       },
       {
         "id": "q48",
-        "label": "Equal Opportunity Policy"
+        "num": 53,
+        "prompt": "Does your NGO have an Equal Opportunity Policy?",
+        "label": "Equal Opportunity Policy",
+        "driveItem": "Equal Opportunity Policy"
       },
       {
         "id": "q49",
-        "label": "Diversity, Equity & Inclusion Policy"
+        "num": 54,
+        "prompt": "Does your NGO have a Diversity, Equity & Inclusion (DEI) Policy?",
+        "label": "Diversity, Equity & Inclusion (DEI) Policy",
+        "driveItem": "Diversity, Equity & Inclusion (DEI) Policy"
       }
     ]
   },
@@ -225,35 +372,59 @@
     "questions": [
       {
         "id": "q50",
-        "label": "Monitoring & Evaluation Framework"
+        "num": 55,
+        "prompt": "Does your NGO have a documented Monitoring & Evaluation (M&E) Framework?",
+        "label": "Monitoring & Evaluation (M&E) Framework",
+        "driveItem": "Monitoring & Evaluation (M&E) Framework Document"
       },
       {
         "id": "q51",
-        "label": "Theory of Change"
+        "num": 56,
+        "prompt": "Does your NGO have a documented Theory of Change (ToC)?",
+        "label": "Theory of Change (ToC)",
+        "driveItem": "Theory of Change (ToC) Document"
       },
       {
         "id": "q52",
-        "label": "Data Collection Protocols"
+        "num": 57,
+        "prompt": "Does your NGO have standardized Data Collection Protocols?",
+        "label": "Data Collection Protocols",
+        "driveItem": "Data Collection Protocols / SOPs"
       },
       {
         "id": "q53",
-        "label": "Beneficiary Consent Forms"
+        "num": 58,
+        "prompt": "Does your NGO use standardized Beneficiary Consent Forms (for data, photos, and stories)?",
+        "label": "Beneficiary Consent Forms",
+        "driveItem": "Blank Beneficiary Consent Form Template"
       },
       {
         "id": "q54",
-        "label": "Programme Documentation System"
+        "num": 59,
+        "prompt": "Does your NGO have a structured Programme Documentation System?",
+        "label": "Programme Documentation System",
+        "driveItem": null
       },
       {
         "id": "q55",
-        "label": "Impact Measurement Framework"
+        "num": 60,
+        "prompt": "Does your NGO have an Impact Measurement Framework?",
+        "label": "Impact Measurement Framework",
+        "driveItem": "Impact Measurement Framework Document"
       },
       {
         "id": "q56",
-        "label": "Complaint & Feedback Mechanism"
+        "num": 61,
+        "prompt": "Does your NGO have a Beneficiary Complaint & Feedback Mechanism?",
+        "label": "Complaint & Feedback Mechanism",
+        "driveItem": "Beneficiary Complaint & Feedback Mechanism SOP"
       },
       {
         "id": "q57",
-        "label": "Community Safeguarding Procedures"
+        "num": 62,
+        "prompt": "Does your NGO have documented Community Safeguarding Procedures?",
+        "label": "Community Safeguarding Procedures",
+        "driveItem": "Community Safeguarding Procedures Document"
       }
     ]
   },
@@ -262,31 +433,52 @@
     "questions": [
       {
         "id": "q58",
-        "label": "Data Protection Policy"
+        "num": 63,
+        "prompt": "Does your NGO have a Data Protection Policy?",
+        "label": "Data Protection Policy",
+        "driveItem": "Data Protection Policy"
       },
       {
         "id": "q59",
-        "label": "Privacy Policy"
+        "num": 64,
+        "prompt": "Does your NGO have a Privacy Policy?",
+        "label": "Privacy Policy",
+        "driveItem": "Privacy Policy"
       },
       {
         "id": "q60",
-        "label": "Information Security Policy"
+        "num": 65,
+        "prompt": "Does your NGO have an Information Security Policy?",
+        "label": "Information Security Policy",
+        "driveItem": "Information Security Policy"
       },
       {
         "id": "q61",
-        "label": "Cyber Security Practices"
+        "num": 66,
+        "prompt": "Does your NGO follow standardized Cyber Security Practices?",
+        "label": "Cyber Security Practices",
+        "driveItem": null
       },
       {
         "id": "q62",
-        "label": "Data Backup System"
+        "num": 67,
+        "prompt": "Does your NGO have an automated or regular Data Backup System?",
+        "label": "Data Backup System",
+        "driveItem": null
       },
       {
         "id": "q63",
-        "label": "Document Retention Policy"
+        "num": 68,
+        "prompt": "Does your NGO have a Document Retention & Archiving Policy?",
+        "label": "Document Retention & Archiving Policy",
+        "driveItem": "Document Retention & Archiving Policy"
       },
       {
         "id": "q64",
-        "label": "IT Acceptable Use Policy"
+        "num": 69,
+        "prompt": "Does your NGO have an IT Acceptable Use Policy?",
+        "label": "IT Acceptable Use Policy",
+        "driveItem": "IT Acceptable Use Policy"
       }
     ]
   },
@@ -295,47 +487,80 @@
     "questions": [
       {
         "id": "q65",
-        "label": "Functional Website"
+        "num": 70,
+        "prompt": "Does your NGO have an active, functional website?",
+        "label": "Active, Functional Website",
+        "driveItem": null
       },
       {
         "id": "q66",
-        "label": "Audited Financial Statements on Website"
+        "num": 71,
+        "prompt": "Are your NGO's Audited Financial Statements published on your website?",
+        "label": "Audited Financial Statements on Website",
+        "driveItem": null
       },
       {
         "id": "q67",
-        "label": "Board Member Details"
+        "num": 72,
+        "prompt": "Does your NGO maintain a document or webpage with complete Board Member Details?",
+        "label": "Board Member Details",
+        "driveItem": "Board Members List (with Designations & Brief Profiles)"
       },
       {
         "id": "q68",
-        "label": "Key Staff Details"
+        "num": 73,
+        "prompt": "Does your NGO maintain a document or webpage with Key Leadership / Staff Details?",
+        "label": "Key Leadership & Staff Details",
+        "driveItem": "Key Staff & Leadership Profile Document"
       },
       {
         "id": "q69",
-        "label": "Impact Stories"
+        "num": 74,
+        "prompt": "Does your NGO have documented Impact Stories / Case Studies?",
+        "label": "Impact Stories / Case Studies",
+        "driveItem": "Compendium of Impact Stories / Case Studies"
       },
       {
         "id": "q70",
-        "label": "Organization Profile/Brochure"
+        "num": 75,
+        "prompt": "Does your NGO have an Organization Profile or Brochure?",
+        "label": "Organization Profile or Brochure",
+        "driveItem": "Organization Profile / Brochure"
       },
       {
         "id": "q71",
-        "label": "Corporate Presentation (Pitch Deck)"
+        "num": 76,
+        "prompt": "Does your NGO have a Corporate CSR Presentation (Pitch Deck)?",
+        "label": "Corporate Presentation (Pitch Deck)",
+        "driveItem": "Corporate Presentation (Pitch Deck)"
       },
       {
         "id": "q72",
-        "label": "Monthly Newsletter"
+        "num": 77,
+        "prompt": "Does your NGO publish a Monthly or Quarterly Newsletter?",
+        "label": "Monthly / Quarterly Newsletter",
+        "driveItem": "Recent Newsletter Issue (PDF)"
       },
       {
         "id": "q73",
-        "label": "Social Media Presence"
+        "num": 78,
+        "prompt": "Does your NGO have an active Social Media Presence?",
+        "label": "Social Media Presence",
+        "driveItem": null
       },
       {
         "id": "q74",
-        "label": "Branding Guidelines"
+        "num": 79,
+        "prompt": "Does your NGO have documented Branding Guidelines?",
+        "label": "Branding Guidelines",
+        "driveItem": "Brand Guidelines Manual"
       },
       {
         "id": "q75",
-        "label": "Branding material"
+        "num": 80,
+        "prompt": "Does your NGO have standardized Branding Collateral / Materials?",
+        "label": "Branding Collateral / Materials",
+        "driveItem": "Sample Branding Collateral (Templates / Standees / Flyers)"
       }
     ]
   },
@@ -344,39 +569,66 @@
     "questions": [
       {
         "id": "q76",
-        "label": "Due Diligence Folder"
+        "num": 81,
+        "prompt": "Does your NGO maintain a ready-to-share Due Diligence Folder?",
+        "label": "Due Diligence Folder",
+        "driveItem": null
       },
       {
         "id": "q77",
-        "label": "Board KYC Documents"
+        "num": 82,
+        "prompt": "Does your NGO have complete KYC Documents (PAN, Aadhaar, Address Proof) for all Board Members?",
+        "label": "Board Member KYC Documents",
+        "driveItem": "Board Member KYC Documents"
       },
       {
         "id": "q78",
-        "label": "Key Staff CVs"
+        "num": 83,
+        "prompt": "Does your NGO have updated CVs/Resumes for Key Staff Members?",
+        "label": "Key Staff CVs / Resumes",
+        "driveItem": "Key Staff CVs / Resumes"
       },
       {
         "id": "q79",
-        "label": "Strategic Plan"
+        "num": 84,
+        "prompt": "Does your NGO have a multi-year Strategic Plan (3\u20135 years)?",
+        "label": "Multi-Year Strategic Plan (3\u20135 Years)",
+        "driveItem": "Strategic Plan Document"
       },
       {
         "id": "q80",
-        "label": "Annual Budget"
+        "num": 85,
+        "prompt": "Does your NGO have a Board-approved Annual Budget for the current financial year?",
+        "label": "Board-Approved Annual Budget",
+        "driveItem": "Approved Annual Organizational Budget"
       },
       {
         "id": "q81",
-        "label": "Organogram"
+        "num": 86,
+        "prompt": "Does your NGO have an updated Organizational Chart (Organogram)?",
+        "label": "Organizational Chart (Organogram)",
+        "driveItem": "Organizational Chart (Organogram)"
       },
       {
         "id": "q82",
-        "label": "References from Donors/Partners"
+        "num": 87,
+        "prompt": "Does your NGO have Reference Letters or Sanction Letters from past/current Donors or Partners?",
+        "label": "Donor / Partner Reference Letters",
+        "driveItem": "Donor / Partner Reference Letters or Grant Sanction Letters"
       },
       {
         "id": "q83",
-        "label": "Monitoring & Evaluation Reports"
+        "num": 88,
+        "prompt": "Does your NGO have project-specific Monitoring & Evaluation (M&E) or Impact Reports?",
+        "label": "Project M&E / Impact Reports",
+        "driveItem": "Sample Project M&E / Impact Evaluation Reports"
       },
       {
         "id": "q84",
-        "label": "Bank Details & Cancelled Cheque"
+        "num": 89,
+        "prompt": "Does your NGO have official Bank Account Details & a Cancelled Cheque (for Domestic/CSR and FCRA accounts)?",
+        "label": "Bank Account Details & Cancelled Cheque",
+        "driveItem": "Bank Account Details & Cancelled Cheque Copy"
       }
     ]
   },
@@ -385,23 +637,38 @@
     "questions": [
       {
         "id": "q85",
-        "label": "Anti-Terror Financing Declaration"
+        "num": 90,
+        "prompt": "Does your NGO have a signed Anti-Terror Financing Declaration / Policy?",
+        "label": "Anti-Terror Financing Declaration / Policy",
+        "driveItem": "Anti-Terror Financing Declaration / Policy"
       },
       {
         "id": "q86",
-        "label": "Anti-Money Laundering (AML) Policy"
+        "num": 91,
+        "prompt": "Does your NGO have an Anti-Money Laundering (AML) Policy?",
+        "label": "Anti-Money Laundering (AML) Policy",
+        "driveItem": "Anti-Money Laundering (AML) Policy"
       },
       {
         "id": "q87",
-        "label": "Fraud Reporting Mechanism"
+        "num": 92,
+        "prompt": "Does your NGO have a documented Fraud Reporting Mechanism?",
+        "label": "Fraud Reporting Mechanism",
+        "driveItem": "Fraud Reporting Mechanism SOP"
       },
       {
         "id": "q88",
-        "label": "Ethical Fundraising Policy"
+        "num": 93,
+        "prompt": "Does your NGO have an Ethical Fundraising Policy?",
+        "label": "Ethical Fundraising Policy",
+        "driveItem": "Ethical Fundraising Policy"
       },
       {
         "id": "q89",
-        "label": "Gift & Hospitality Policy"
+        "num": 94,
+        "prompt": "Does your NGO have a Gift & Hospitality Policy?",
+        "label": "Gift & Hospitality Policy",
+        "driveItem": "Gift & Hospitality Policy"
       }
     ]
   }

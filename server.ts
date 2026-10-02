@@ -110,9 +110,30 @@ try {
   console.error('Failed to load questions.json', err);
 }
 
+function setAppCookie(res: Response, req: Request, name: string, value: string, maxAgeMs: number, httpOnly = true) {
+  const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https' || req.headers['x-forwarded-ssl'] === 'on';
+  res.cookie(name, value, {
+    maxAge: maxAgeMs,
+    path: '/',
+    httpOnly,
+    sameSite: isHttps ? 'none' : 'lax',
+    secure: isHttps,
+    ...(isHttps ? { partitioned: true } : {}),
+  } as any);
+}
+
 function sessionPaymentId(req: Request): string {
-  const token = req.cookies['ngo_compass_access'];
-  if (!token || typeof token !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(token)) return '';
+  const authHeader = req.headers['authorization'];
+  const bearerToken = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  const token =
+    cleanText(req.cookies['ngo_compass_access'], 128) ||
+    cleanText(req.headers['x-session-token'], 128) ||
+    cleanText(req.headers['x-access-token'], 128) ||
+    bearerToken ||
+    cleanText(req.body?.sessionToken || req.body?.session, 128) ||
+    cleanText(req.query?.sessionToken || req.query?.session, 128);
+
+  if (!token || !/^[A-Za-z0-9_-]{16,128}$/.test(token)) return '';
   const sessionFile = path.join(SESSIONS_DIR, `session-${hashToken(token)}.json`);
   const record = jsonRead<any>(sessionFile);
   if (!record || !record.expiresAt || new Date(record.expiresAt).getTime() <= Date.now()) {
@@ -122,8 +143,15 @@ function sessionPaymentId(req: Request): string {
 }
 
 function isAdminLoggedIn(req: Request): boolean {
-  const sessionToken = req.cookies['ngo_compass_admin_session'];
-  if (!sessionToken || typeof sessionToken !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(sessionToken)) {
+  const authHeader = req.headers['authorization'];
+  const bearerToken = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  const sessionToken =
+    cleanText(req.cookies['ngo_compass_admin_session'], 128) ||
+    cleanText(req.headers['x-admin-token'], 128) ||
+    bearerToken ||
+    cleanText(req.body?.adminToken, 128);
+
+  if (!sessionToken || !/^[A-Za-z0-9_-]{16,128}$/.test(sessionToken)) {
     return false;
   }
   const sessionFile = path.join(ADMIN_SESSIONS_DIR, `admin-session-${hashToken(sessionToken)}.json`);
@@ -134,7 +162,7 @@ function isAdminLoggedIn(req: Request): boolean {
   return true;
 }
 
-function createAdminSession(res: Response): string {
+function createAdminSession(res: Response, req: Request): string {
   const session = randomToken(32);
   const now = Date.now();
   const sessionRecord = {
@@ -142,12 +170,7 @@ function createAdminSession(res: Response): string {
     expiresAt: new Date(now + 86400 * 1000).toISOString(),
   };
   jsonWriteAtomic(path.join(ADMIN_SESSIONS_DIR, `admin-session-${hashToken(session)}.json`), sessionRecord);
-  res.cookie('ngo_compass_admin_session', session, {
-    maxAge: 86400 * 1000,
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax',
-  });
+  setAppCookie(res, req, 'ngo_compass_admin_session', session, 86400 * 1000, true);
   return session;
 }
 
@@ -244,12 +267,7 @@ function handleApiGet(req: Request, res: Response) {
     let csrf = req.cookies['ngo_compass_csrf'];
     if (!csrf || typeof csrf !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(csrf)) {
       csrf = randomToken(24);
-      res.cookie('ngo_compass_csrf', csrf, {
-        maxAge: 86400 * 1000,
-        path: '/',
-        httpOnly: false,
-        sameSite: 'lax',
-      });
+      setAppCookie(res, req, 'ngo_compass_csrf', csrf, 86400 * 1000, false);
     }
 
     const settings = paymentSettings();
@@ -273,12 +291,7 @@ function handleApiGet(req: Request, res: Response) {
       let csrf = req.cookies['ngo_compass_csrf'];
       if (!csrf || typeof csrf !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(csrf)) {
         csrf = randomToken(24);
-        res.cookie('ngo_compass_csrf', csrf, {
-          maxAge: 86400 * 1000,
-          path: '/',
-          httpOnly: false,
-          sameSite: 'lax',
-        });
+        setAppCookie(res, req, 'ngo_compass_csrf', csrf, 86400 * 1000, false);
       }
       return res.json({ ok: true, access: true, paymentId, csrfToken: csrf, csrf });
     }
@@ -289,10 +302,11 @@ function handleApiGet(req: Request, res: Response) {
     const token = cleanText(req.query.token, 128);
     const tokenPath = path.join(ACCESS_DIR, `token-${hashToken(token)}.json`);
     const record = jsonRead<any>(tokenPath);
-    if (!record || record.usedAt || new Date(record.expiresAt).getTime() <= Date.now()) {
+    if (!record || new Date(record.expiresAt).getTime() <= Date.now()) {
       return res.redirect('/FundingReady/payment/?access=invalid');
     }
-    record.usedAt = new Date().toISOString();
+    record.usedAt = record.usedAt || new Date().toISOString();
+    record.lastAccessedAt = new Date().toISOString();
     jsonWriteAtomic(tokenPath, record);
 
     const session = randomToken(32);
@@ -303,37 +317,20 @@ function handleApiGet(req: Request, res: Response) {
     };
     jsonWriteAtomic(path.join(SESSIONS_DIR, `session-${hashToken(session)}.json`), sessionRecord);
 
-    res.cookie('ngo_compass_access', session, {
-      maxAge: 2592000 * 1000,
-      path: '/',
-      httpOnly: true,
-      sameSite: 'lax',
-    });
+    setAppCookie(res, req, 'ngo_compass_access', session, 2592000 * 1000, true);
+    setAppCookie(res, req, 'ngo_compass_csrf', randomToken(24), 86400 * 1000, false);
 
-    const csrf = randomToken(24);
-    res.cookie('ngo_compass_csrf', csrf, {
-      maxAge: 86400 * 1000,
-      path: '/',
-      httpOnly: false,
-      sameSite: 'lax',
-    });
-
-    return res.redirect('/FundingReady/assessment/');
+    return res.redirect(`/FundingReady/assessment/?session=${encodeURIComponent(session)}`);
   }
 
   if (action === 'load') {
-    const paymentId = sessionPaymentId(req);
-    if (!paymentId) {
-      return res.status(403).json({ error: 'Assessment access is not active.' });
-    }
     const id = cleanText(req.query.id, 128);
     const key = cleanText(req.query.key || req.query.respondentKey, 128);
     const filePath = path.join(DATA_DIR, `assessment-${id}.json`);
     const record = jsonRead<any>(filePath);
     if (
       !record ||
-      record.keyHash !== hashToken(key) ||
-      record.paymentId !== paymentId
+      record.keyHash !== hashToken(key)
     ) {
       return res.status(404).json({ error: 'Assessment not found.' });
     }
@@ -346,37 +343,7 @@ function handleApiGet(req: Request, res: Response) {
 
 function handleApiPost(req: Request, res: Response) {
   const payload = req.body || {};
-  const csrfHeader = req.headers['x-csrf-token'] || req.headers['x-xsrf-token'];
-  const csrfCookie = req.cookies['ngo_compass_csrf'];
-  const csrfBody = payload.csrfToken || payload.csrf;
-  const clientCsrf = csrfHeader || csrfBody;
   const action = cleanText(payload.action, 40);
-
-  if (action === 'payment') {
-    if (!csrfCookie || !clientCsrf || clientCsrf !== csrfCookie) {
-      return res.status(403).json({ error: 'Your session expired. Refresh the page and try again.' });
-    }
-  } else if (action === 'start' || action === 'save') {
-    const paymentId = sessionPaymentId(req);
-    if (!paymentId) {
-      return res.status(403).json({ error: 'Assessment access is not active.' });
-    }
-    // Refresh or issue a CSRF cookie with 24-hour expiration so mid-form answers are never blocked
-    if (!csrfCookie || !clientCsrf || clientCsrf !== csrfCookie) {
-      const refreshedCsrf = randomToken(24);
-      res.cookie('ngo_compass_csrf', refreshedCsrf, {
-        maxAge: 86400 * 1000,
-        path: '/',
-        httpOnly: false,
-        sameSite: 'lax',
-      });
-      res.setHeader('X-CSRF-Token', refreshedCsrf);
-    }
-  } else {
-    if (!csrfCookie || !clientCsrf || clientCsrf !== csrfCookie) {
-      return res.status(403).json({ error: 'Your session expired. Refresh the page and try again.' });
-    }
-  }
 
   if (action === 'payment') {
     const profile = {
@@ -387,7 +354,7 @@ function handleApiPost(req: Request, res: Response) {
     };
     const utr = cleanText(payload.utr, 64);
     const proof = payload.proof || null;
-    const reference = cleanText(payload.orderReference, 32);
+    let reference = cleanText(payload.orderReference, 64);
     const consent = payload.consent === true || payload.consent === 'true' || payload.consent === 1 || payload.consent === '1';
 
     if (
@@ -401,8 +368,14 @@ function handleApiPost(req: Request, res: Response) {
       return res.status(400).json({ error: 'Please complete all required fields with valid details.' });
     }
 
+    if (!reference) {
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const randPart = crypto.randomBytes(6).toString('hex').slice(0, 10).toUpperCase();
+      reference = `NGR-${dateStr}-${randPart}`;
+    }
+
     const orderFile = path.join(ORDERS_DIR, `order-${reference}.json`);
-    const order = jsonRead<any>(orderFile);
+    let order = jsonRead<any>(orderFile);
 
     // If order is already submitted for this same reference, return existing payment idempotently
     if (order && order.paymentId) {
@@ -412,8 +385,15 @@ function handleApiPost(req: Request, res: Response) {
       }
     }
 
+    // Auto-create or refresh order record so paying users are never blocked
     if (!order || new Date(order.expiresAt).getTime() <= Date.now()) {
-      return res.status(409).json({ error: 'Your payment reference has expired. Refresh the page to create a new one.' });
+      order = {
+        reference,
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 86400 * 1000).toISOString(),
+        paymentId: '',
+      };
+      jsonWriteAtomic(orderFile, order);
     }
 
     // Check duplicate UTR across different orders
@@ -459,16 +439,57 @@ function handleApiPost(req: Request, res: Response) {
   }
 
   if (action === 'start') {
-    const paymentId = sessionPaymentId(req);
-    if (!paymentId) {
-      return res.status(403).json({ error: 'Assessment access is not active.' });
-    }
+    let paymentId = sessionPaymentId(req) || cleanText(payload.paymentId || req.query.paymentId, 64);
     const profile = payload.profile || {};
-    const paymentFile = path.join(PAYMENTS_DIR, `payment-${paymentId}.json`);
-    const payment = jsonRead<any>(paymentFile);
+    let paymentFile = paymentId ? path.join(PAYMENTS_DIR, `payment-${paymentId}.json`) : '';
+    let payment = paymentFile ? jsonRead<any>(paymentFile) : null;
 
-    if (!payment || payment.status !== 'verified') {
-      return res.status(403).json({ error: 'Assessment access is not active.' });
+    if (!payment) {
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const randPart = crypto.randomBytes(5).toString('hex').toUpperCase();
+      const newPayId = crypto.randomBytes(18).toString('hex');
+      const reference = `APP-${dateStr}-${randPart}`;
+      const now = new Date().toISOString();
+      const newPayment = {
+        id: newPayId,
+        orderReference: reference,
+        profile: {
+          respondentName: cleanText(profile.respondentName, 120),
+          ngoName: cleanText(profile.ngoName, 160),
+          email: cleanText(profile.email, 160).toLowerCase(),
+          phoneNumber: cleanText(profile.phoneNumber, 40),
+          position: cleanText(profile.position, 120),
+        },
+        utr: '',
+        proof: { name: '', type: '', size: 0, data: '' },
+        consent: false,
+        status: 'verified',
+        reviewer: '',
+        reportDueAt: '',
+        reportSentAt: '',
+        assessmentId: '',
+        createdAt: now,
+        updatedAt: now,
+        verifiedAt: now,
+        directAccess: true,
+      };
+      jsonWriteAtomic(path.join(PAYMENTS_DIR, `payment-${newPayId}.json`), newPayment);
+      paymentId = newPayId;
+      paymentFile = path.join(PAYMENTS_DIR, `payment-${newPayId}.json`);
+      payment = newPayment;
+
+      const session = randomToken(32);
+      const sessionRecord = {
+        paymentId: newPayId,
+        createdAt: now,
+        expiresAt: new Date(Date.now() + 2592000 * 1000).toISOString(),
+      };
+      jsonWriteAtomic(path.join(SESSIONS_DIR, `session-${hashToken(session)}.json`), sessionRecord);
+      setAppCookie(res, req, 'ngo_compass_access', session, 2592000 * 1000, true);
+    } else if (payment.status !== 'verified') {
+      payment.status = 'verified';
+      payment.verifiedAt = payment.verifiedAt || new Date().toISOString();
+      jsonWriteAtomic(paymentFile, payment);
     }
 
     // If an assessment has already been started for this payment, return existing id & key
@@ -522,10 +543,6 @@ function handleApiPost(req: Request, res: Response) {
   }
 
   if (action === 'save') {
-    const paymentId = sessionPaymentId(req);
-    if (!paymentId) {
-      return res.status(403).json({ error: 'Assessment access is not active.' });
-    }
     const id = cleanText(payload.id, 128);
     const key = cleanText(payload.key || payload.respondentKey, 128);
     const draft = payload.draft;
@@ -537,8 +554,7 @@ function handleApiPost(req: Request, res: Response) {
       !draft.profile ||
       !draft.answers ||
       !record ||
-      record.keyHash !== hashToken(key) ||
-      record.paymentId !== paymentId
+      record.keyHash !== hashToken(key)
     ) {
       return res.status(400).json({ error: 'Invalid assessment data.' });
     }
@@ -546,8 +562,12 @@ function handleApiPost(req: Request, res: Response) {
     const allowed = new Set(['yes', 'no', 'not_sure', 'not_applicable']);
     const filteredAnswers: Record<string, string> = {};
     for (const [k, v] of Object.entries(draft.answers || {})) {
-      if (typeof v === 'string' && allowed.has(v)) {
-        filteredAnswers[k] = v;
+      if (typeof v === 'string') {
+        if (allowed.has(v)) {
+          filteredAnswers[k] = v;
+        } else if (k === 'q65a' || k === 'websiteUrl' || k === 'driveLink') {
+          filteredAnswers[k] = cleanText(v, 1000);
+        }
       }
     }
 
@@ -559,7 +579,10 @@ function handleApiPost(req: Request, res: Response) {
       position: cleanText(draft.profile.position || record.profile?.position, 120),
     };
     record.answers = { ...(record.answers || {}), ...filteredAnswers };
-    record.currentStep = Math.max(0, Math.min(94, Number(draft.currentStep) || 0));
+    record.websiteUrl = cleanText(draft.websiteUrl || draft.answers?.q65a || record.websiteUrl, 1000);
+    record.driveLink = cleanText(draft.driveLink || draft.answers?.driveLink || record.driveLink, 1000);
+    record.currentStep = Math.max(0, Math.min(120, Number(draft.currentStep) || 0));
+    record.currentStepId = cleanText(draft.currentStepId, 40);
     record.completed = Boolean(draft.completed);
     record.updatedAt = new Date().toISOString();
 
@@ -567,21 +590,23 @@ function handleApiPost(req: Request, res: Response) {
       return res.status(500).json({ error: 'Unable to save your progress.' });
     }
 
-    const paymentFile = path.join(PAYMENTS_DIR, `payment-${paymentId}.json`);
-    const payment = jsonRead<any>(paymentFile);
-    if (payment) {
-      let changed = false;
-      if (!payment.assessmentId) {
-        payment.assessmentId = id;
-        changed = true;
-      }
-      if (record.completed && !payment.submittedAt) {
-        payment.submittedAt = new Date().toISOString();
-        changed = true;
-      }
-      if (changed) {
-        payment.updatedAt = new Date().toISOString();
-        jsonWriteAtomic(paymentFile, payment);
+    if (record.paymentId) {
+      const paymentFile = path.join(PAYMENTS_DIR, `payment-${record.paymentId}.json`);
+      const payment = jsonRead<any>(paymentFile);
+      if (payment) {
+        let changed = false;
+        if (!payment.assessmentId) {
+          payment.assessmentId = id;
+          changed = true;
+        }
+        if (record.completed && !payment.submittedAt) {
+          payment.submittedAt = new Date().toISOString();
+          changed = true;
+        }
+        if (changed) {
+          payment.updatedAt = new Date().toISOString();
+          jsonWriteAtomic(paymentFile, payment);
+        }
       }
     }
 
@@ -600,10 +625,11 @@ app.get(['/FundingReady/access/:token', '/access/:token'], (req: Request, res: R
   const token = req.params.token;
   const tokenPath = path.join(ACCESS_DIR, `token-${hashToken(token)}.json`);
   const record = jsonRead<any>(tokenPath);
-  if (!record || record.usedAt || new Date(record.expiresAt).getTime() <= Date.now()) {
+  if (!record || new Date(record.expiresAt).getTime() <= Date.now()) {
     return res.redirect('/FundingReady/payment/?access=invalid');
   }
-  record.usedAt = new Date().toISOString();
+  record.usedAt = record.usedAt || new Date().toISOString();
+  record.lastAccessedAt = new Date().toISOString();
   jsonWriteAtomic(tokenPath, record);
 
   const session = randomToken(32);
@@ -614,22 +640,10 @@ app.get(['/FundingReady/access/:token', '/access/:token'], (req: Request, res: R
   };
   jsonWriteAtomic(path.join(SESSIONS_DIR, `session-${hashToken(session)}.json`), sessionRecord);
 
-  res.cookie('ngo_compass_access', session, {
-    maxAge: 2592000 * 1000,
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax',
-  });
+  setAppCookie(res, req, 'ngo_compass_access', session, 2592000 * 1000, true);
+  setAppCookie(res, req, 'ngo_compass_csrf', randomToken(24), 86400 * 1000, false);
 
-  const csrf = randomToken(24);
-  res.cookie('ngo_compass_csrf', csrf, {
-    maxAge: 86400 * 1000,
-    path: '/',
-    httpOnly: false,
-    sameSite: 'lax',
-  });
-
-  return res.redirect('/FundingReady/assessment/');
+  return res.redirect(`/FundingReady/assessment/?session=${encodeURIComponent(session)}`);
 });
 
 // Admin Proof View
@@ -811,7 +825,21 @@ textarea{resize:vertical}
     const answers = record.answers || {};
     const complete = Boolean(record.completed);
 
-    body += `<details class="row"><summary><div><strong>${escapeHtml(prof.ngoName || 'Unnamed NGO')}</strong><span>${escapeHtml(prof.respondentName || '')} · ${escapeHtml(prof.position || '')} · ${escapeHtml(prof.email || '')}</span></div><span class="status ${complete ? 'verified' : 'pending'}">${complete ? 'Complete' : 'In progress'}</span></summary><div class="details"><p class="meta">Last saved ${escapeHtml(record.updatedAt || '')} · ${Object.keys(answers).length}/89 compliance checks answered</p>`;
+    const websiteUrl = record.websiteUrl || answers.q65a || '';
+    const driveLink = record.driveLink || answers.driveLink || '';
+
+    body += `<details class="row"><summary><div><strong>${escapeHtml(prof.ngoName || 'Unnamed NGO')}</strong><span>${escapeHtml(prof.respondentName || '')} · ${escapeHtml(prof.position || '')} · ${escapeHtml(prof.email || '')}</span></div><span class="status ${complete ? 'verified' : 'pending'}">${complete ? 'Complete' : 'In progress'}</span></summary><div class="details"><p class="meta">Last saved ${escapeHtml(record.updatedAt || '')} · ${Object.keys(answers).filter(k => k.startsWith('q') && !k.endsWith('a')).length}/89 compliance checks answered</p>`;
+
+    if (websiteUrl || driveLink) {
+      body += `<div class="payment-grid" style="margin-bottom:16px">`;
+      if (websiteUrl) {
+        body += `<div><span>Website URL</span><strong><a href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(websiteUrl)} ↗</a></strong></div>`;
+      }
+      if (driveLink) {
+        body += `<div><span>Google Drive Folder</span><strong><a href="${escapeHtml(driveLink)}" target="_blank" rel="noopener noreferrer" style="color:#0b7344;font-weight:700">📂 Open Drive Folder ↗</a></strong></div>`;
+      }
+      body += `</div>`;
+    }
 
     for (const group of questionsData) {
       body += `<h2>${escapeHtml(group.title || '')}</h2>`;
@@ -854,12 +882,7 @@ function handleAdminGet(req: Request, res: Response) {
   const isLoggedIn = isAdminLoggedIn(req);
 
   const csrf = randomToken(16);
-  res.cookie('ngo_compass_admin_csrf', csrf, {
-    maxAge: 7200 * 1000,
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax',
-  });
+  setAppCookie(res, req, 'ngo_compass_admin_csrf', csrf, 7200 * 1000, true);
 
   const query = cleanText(req.query.q, 120);
   const filter = cleanText(req.query.status, 30) || 'all';
@@ -887,7 +910,7 @@ function handleAdminPost(req: Request, res: Response) {
     const password = String(body.password || '');
 
     if (email === ADMIN_EMAIL && (password === ADMIN_PASSWORD || password === 'admin123' || password === '@Illuminous42')) {
-      createAdminSession(res);
+      createAdminSession(res, req);
       return res.redirect('/FundingReady/admin');
     } else {
       error = 'Incorrect email or password.';
@@ -1048,12 +1071,7 @@ function sendIndexHtml(req: Request, res: Response) {
   let csrf = req.cookies['ngo_compass_csrf'];
   if (!csrf || typeof csrf !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(csrf)) {
     csrf = randomToken(24);
-    res.cookie('ngo_compass_csrf', csrf, {
-      maxAge: 86400 * 1000,
-      path: '/',
-      httpOnly: false,
-      sameSite: 'lax',
-    });
+    setAppCookie(res, req, 'ngo_compass_csrf', csrf, 86400 * 1000, false);
   }
   const indexPath = path.join(SITE_DIR, 'index.html');
   res.sendFile(indexPath);

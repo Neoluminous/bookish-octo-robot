@@ -33,8 +33,142 @@
         border-color: #0b5132;
         box-shadow: 0 4px 12px rgba(11, 81, 50, 0.12);
       }
+      .answer-buttons { gap: 12px; margin-left: auto; display: flex; }
+      .answer-button {
+        cursor: pointer;
+        min-height: 52px;
+        font: inherit;
+        border-radius: 13px;
+        padding: 0 21px;
+        font-weight: 740;
+        color: #ffffff !important;
+        border: 1px solid transparent;
+        min-width: 136px;
+        box-shadow: 0 9px 18px rgba(6, 44, 28, 0.16);
+        transition: transform 0.16s, box-shadow 0.16s, background 0.16s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #33423a;
+      }
+      .answer-button.yes { background: linear-gradient(135deg, #0a7546, #075a35) !important; border-color: #075a35 !important; }
+      .answer-button.no { background: #33423a !important; border-color: #29372f !important; }
+      .answer-button.not_applicable,
+      .answer-button.not-applicable,
+      .answer-button.not.applicable {
+        background: #4a5750 !important;
+        border-color: #3b4741 !important;
+        color: #ffffff !important;
+      }
+      .answer-button.not_applicable:hover,
+      .answer-button.not-applicable:hover {
+        background: #3c4842 !important;
+      }
+      .answer-button.selected {
+        outline-offset: 3px;
+        outline: 3px solid #b7e8c6;
+        box-shadow: 0 0 0 5px rgba(18, 107, 66, 0.2), 0 14px 24px rgba(6, 44, 28, 0.24);
+      }
+      .q-badge-wrap {
+        margin: 0 0 14px 0;
+        display: flex;
+        align-items: center;
+      }
+      .q-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 13px;
+        background: #e8f4ec;
+        color: #0b5132;
+        font-weight: 750;
+        font-size: 13px;
+        border-radius: 999px;
+        letter-spacing: 0.02em;
+        border: 1px solid #bfe2cc;
+        box-shadow: 0 2px 6px rgba(11, 81, 50, 0.06);
+      }
+      .drive-checklist {
+        background: #f7faf8;
+        border: 1px solid #c7dece;
+        border-radius: 16px;
+        padding: 22px 24px;
+        margin: 24px 0;
+        box-shadow: 0 4px 14px rgba(6, 44, 28, 0.05);
+      }
+      .drive-checklist-header {
+        font-size: 14.5px;
+        font-weight: 750;
+        color: #063d25;
+        margin-bottom: 14px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #dcebe1;
+      }
+      .drive-section {
+        margin: 16px 0;
+      }
+      .drive-section:first-child { margin-top: 0; }
+      .drive-section-title {
+        font-size: 13px;
+        font-weight: 750;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #0d5f3b;
+        margin: 0 0 8px 0;
+      }
+      .drive-item-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 8px;
+      }
+      .drive-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        font-size: 13.5px;
+        line-height: 1.45;
+        color: #26382e;
+        padding: 6px 10px;
+        background: #ffffff;
+        border: 1px solid #e1ede5;
+        border-radius: 8px;
+      }
+      .drive-item-bullet {
+        color: #0a7546;
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+      .drive-tip-box {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        background: #edf8f1;
+        border: 1px solid #bfe2cc;
+        border-radius: 12px;
+        padding: 14px 18px;
+        margin: 18px 0 24px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #064528;
+      }
+      .drive-tip-box p { margin: 0; }
+      .drive-tip-icon { font-size: 17px; line-height: 1; flex-shrink: 0; }
+      .review-drive-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #0a7546;
+        font-weight: 700;
+        text-decoration: underline;
+        word-break: break-all;
+      }
+      .review-drive-link:hover { color: #064528; }
       @media (max-width: 640px) {
         .admin-nav-link { padding: 6px 11px; font-size: 12px; }
+        .answer-buttons { margin-left: 0; width: 100%; flex-direction: column; }
+        .answer-button { width: 100%; min-width: 0; }
+        .drive-checklist { padding: 16px; }
       }
     </style>
   </head>
