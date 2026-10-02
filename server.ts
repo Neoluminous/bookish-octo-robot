@@ -4,25 +4,27 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SCHEMA_VERSION, validateDraft } from './assessment-schema.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'contact@ngocompass.com').toLowerCase();
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data-dev'));
 const PAYMENTS_DIR = path.join(DATA_DIR, 'payments');
 const ACCESS_DIR = path.join(DATA_DIR, 'access');
 const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
 const ADMIN_SESSIONS_DIR = path.join(DATA_DIR, 'admin_sessions');
 const ORDERS_DIR = path.join(DATA_DIR, 'orders');
 const SETTINGS_FILE = path.join(DATA_DIR, 'payment-settings.json');
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const SITE_DIR = path.join(__dirname, 'site');
 
 // Ensure storage directories exist
-for (const dir of [DATA_DIR, PAYMENTS_DIR, ACCESS_DIR, SESSIONS_DIR, ADMIN_SESSIONS_DIR, ORDERS_DIR]) {
+for (const dir of [DATA_DIR, PAYMENTS_DIR, ACCESS_DIR, SESSIONS_DIR, ADMIN_SESSIONS_DIR, ORDERS_DIR, UPLOADS_DIR]) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
@@ -48,13 +50,14 @@ function jsonRead<T = any>(filePath: string): T | null {
 }
 
 function jsonWriteAtomic(filePath: string, record: any): boolean {
+  const tempFile = path.join(path.dirname(filePath), `.write-${crypto.randomBytes(6).toString('hex')}`);
   try {
-    const tempFile = path.join(path.dirname(filePath), `.write-${crypto.randomBytes(6).toString('hex')}`);
-    fs.writeFileSync(tempFile, JSON.stringify(record, null, 2), 'utf-8');
+    fs.writeFileSync(tempFile, JSON.stringify(record, null, 2), { encoding: 'utf-8', mode: 0o600, flag: 'wx' });
     fs.renameSync(tempFile, filePath);
     return true;
   } catch (err) {
-    console.error('Failed to write atomic file:', filePath, err);
+    try { fs.unlinkSync(tempFile); } catch {}
+    console.error('Failed to write application data.');
     return false;
   }
 }
@@ -62,6 +65,68 @@ function jsonWriteAtomic(filePath: string, record: any): boolean {
 function cleanText(value: any, max: number): string {
   if (typeof value !== 'string') return '';
   return value.trim().slice(0, max);
+}
+
+function validId(value: any): string {
+  return typeof value === 'string' && /^[a-f0-9]{32,40}$/.test(value) ? value : '';
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const first = Buffer.from(hashToken(a));
+  const second = Buffer.from(hashToken(b));
+  return crypto.timingSafeEqual(first, second);
+}
+
+function csrfOk(req: Request): boolean {
+  const origin = req.get('origin');
+  if (origin) {
+    try {
+      if (new URL(origin).host !== req.get('host')) return false;
+    } catch { return false; }
+  }
+  const cookie = cleanText(req.cookies['ngo_compass_csrf'], 128);
+  const provided = cleanText(req.get('x-csrf-token') || req.body?.csrf, 128);
+  return Boolean(cookie && provided && safeEqual(cookie, provided));
+}
+
+function adminCsrfOk(req: Request): boolean {
+  const origin = req.get('origin');
+  if (origin) {
+    try { if (new URL(origin).host !== req.get('host')) return false; }
+    catch { return false; }
+  }
+  const cookie = cleanText(req.cookies['ngo_compass_admin_csrf'], 128);
+  const provided = cleanText(req.get('x-csrf-token') || req.body?.csrf, 128);
+  return Boolean(cookie && provided && safeEqual(cookie, provided));
+}
+
+function proofFromData(value: any): { file: string; type: string; size: number } | null {
+  if (!value || typeof value !== 'object' || typeof value.data !== 'string') return null;
+  const match = /^data:(application\/pdf|image\/jpeg|image\/png);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value.data);
+  if (!match || match[2].length > 7_000_000) return null;
+  const bytes = Buffer.from(match[2], 'base64');
+  if (!bytes.length || bytes.length > 5_000_000) return null;
+  const type = match[1];
+  const valid = type === 'application/pdf' ? bytes.subarray(0, 5).toString() === '%PDF-' :
+    type === 'image/png' ? bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) :
+    bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[bytes.length - 2] === 0xff && bytes[bytes.length - 1] === 0xd9;
+  if (!valid) return null;
+  const extension = type === 'application/pdf' ? 'pdf' : type === 'image/png' ? 'png' : 'jpg';
+  const file = `${crypto.randomBytes(20).toString('hex')}.${extension}`;
+  try { fs.writeFileSync(path.join(UPLOADS_DIR, file), bytes, { flag: 'wx', mode: 0o600 }); }
+  catch { return null; }
+  return { file, type, size: bytes.length };
+}
+
+function sendProtectedFile(res: Response, record: any): Response {
+  if (!record || typeof record.file !== 'string' || !/^[a-f0-9]{40}\.(pdf|png|jpg)$/.test(record.file)) return res.status(404).send('File unavailable.');
+  const file = path.join(UPLOADS_DIR, record.file);
+  if (!fs.existsSync(file)) return res.status(404).send('File unavailable.');
+  res.setHeader('Content-Type', record.type);
+  res.setHeader('Content-Disposition', `attachment; filename="${record.file}"`);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.sendFile(file);
+  return res;
 }
 
 function paymentSettings(): {
@@ -74,8 +139,8 @@ function paymentSettings(): {
   orderReference?: string;
 } {
   const record = jsonRead<any>(SETTINGS_FILE) || {};
-  const payeeName = cleanText(record.payeeName, 160) || 'Kuldeep Sagar';
-  const upiId = cleanText(record.upiId, 160) || 'kuldeep.sgr27@okhdfcbank';
+  const payeeName = cleanText(record.payeeName, 160);
+  const upiId = cleanText(record.upiId, 160);
   const upiPhone = cleanText(record.upiPhone, 40);
   const qrDataUrl = cleanText(record.qrDataUrl, 2000000);
   return {
@@ -83,20 +148,9 @@ function paymentSettings(): {
     upiId,
     upiPhone,
     qrDataUrl,
-    upiUri: `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=1999&cu=INR`,
+    upiUri: payeeName && upiId ? `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=1999&cu=INR` : '',
     available: payeeName !== '' && (upiId !== '' || qrDataUrl !== ''),
   };
-}
-
-// Initialize settings file if missing
-if (!fs.existsSync(SETTINGS_FILE)) {
-  jsonWriteAtomic(SETTINGS_FILE, {
-    payeeName: 'Kuldeep Sagar',
-    upiId: 'kuldeep.sgr27@okhdfcbank',
-    upiPhone: '',
-    qrDataUrl: '',
-    updatedAt: new Date().toISOString(),
-  });
 }
 
 // Read questions
@@ -116,47 +170,33 @@ function setAppCookie(res: Response, req: Request, name: string, value: string, 
     maxAge: maxAgeMs,
     path: '/',
     httpOnly,
-    sameSite: isHttps ? 'none' : 'lax',
+    sameSite: 'lax',
     secure: isHttps,
-    ...(isHttps ? { partitioned: true } : {}),
   } as any);
 }
 
 function sessionPaymentId(req: Request): string {
-  const authHeader = req.headers['authorization'];
-  const bearerToken = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-  const token =
-    cleanText(req.cookies['ngo_compass_access'], 128) ||
-    cleanText(req.headers['x-session-token'], 128) ||
-    cleanText(req.headers['x-access-token'], 128) ||
-    bearerToken ||
-    cleanText(req.body?.sessionToken || req.body?.session, 128) ||
-    cleanText(req.query?.sessionToken || req.query?.session, 128);
+  const token = cleanText(req.cookies['ngo_compass_access'], 128);
 
   if (!token || !/^[A-Za-z0-9_-]{16,128}$/.test(token)) return '';
   const sessionFile = path.join(SESSIONS_DIR, `session-${hashToken(token)}.json`);
   const record = jsonRead<any>(sessionFile);
-  if (!record || !record.expiresAt || new Date(record.expiresAt).getTime() <= Date.now()) {
+  if (!record || record.version !== 2 || !record.expiresAt || new Date(record.expiresAt).getTime() <= Date.now()) {
     return '';
   }
   return cleanText(record.paymentId, 64);
 }
 
 function isAdminLoggedIn(req: Request): boolean {
-  const authHeader = req.headers['authorization'];
-  const bearerToken = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-  const sessionToken =
-    cleanText(req.cookies['ngo_compass_admin_session'], 128) ||
-    cleanText(req.headers['x-admin-token'], 128) ||
-    bearerToken ||
-    cleanText(req.body?.adminToken, 128);
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) return false;
+  const sessionToken = cleanText(req.cookies['ngo_compass_admin_session'], 128);
 
   if (!sessionToken || !/^[A-Za-z0-9_-]{16,128}$/.test(sessionToken)) {
     return false;
   }
   const sessionFile = path.join(ADMIN_SESSIONS_DIR, `admin-session-${hashToken(sessionToken)}.json`);
   const record = jsonRead<any>(sessionFile);
-  if (!record || !record.expiresAt || new Date(record.expiresAt).getTime() <= Date.now()) {
+  if (!record || record.version !== 2 || !record.expiresAt || new Date(record.expiresAt).getTime() <= Date.now()) {
     return false;
   }
   return true;
@@ -166,11 +206,12 @@ function createAdminSession(res: Response, req: Request): string {
   const session = randomToken(32);
   const now = Date.now();
   const sessionRecord = {
+    version: 2,
     createdAt: new Date(now).toISOString(),
-    expiresAt: new Date(now + 86400 * 1000).toISOString(),
+    expiresAt: new Date(now + 8 * 3600 * 1000).toISOString(),
   };
   jsonWriteAtomic(path.join(ADMIN_SESSIONS_DIR, `admin-session-${hashToken(session)}.json`), sessionRecord);
-  setAppCookie(res, req, 'ngo_compass_admin_session', session, 86400 * 1000, true);
+  setAppCookie(res, req, 'ngo_compass_admin_session', session, 8 * 3600 * 1000, true);
   return session;
 }
 
@@ -230,27 +271,63 @@ function answerLabel(answer: any): string {
   switch (answer) {
     case 'yes': return 'Yes';
     case 'no': return 'No';
-    case 'not_sure': return 'Not sure';
+    case 'not_sure': return 'Unsure';
     case 'not_applicable': return 'Not applicable';
     default: return 'Not answered';
   }
 }
 
 function getBaseUrl(req: Request): string {
-  const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim();
-  const host = String(req.headers['x-forwarded-host'] || req.headers.host || `localhost:${PORT}`).split(',')[0].trim();
+  const proto = req.secure ? 'https' : 'http';
+  const host = String(req.headers.host || `localhost:${PORT}`);
   return `${proto}://${host}`;
 }
 
+function redeemAccess(req: Request, res: Response, token: string) {
+  if (!/^[A-Za-z0-9_-]{30,128}$/.test(token)) return res.redirect('/FundingReady/payment/?access=invalid');
+  const tokenPath = path.join(ACCESS_DIR, `token-${hashToken(token)}.json`);
+  const record = jsonRead<any>(tokenPath);
+  const paymentId = validId(record?.paymentId);
+  const payment = paymentId && jsonRead<any>(path.join(PAYMENTS_DIR, `payment-${paymentId}.json`));
+  if (!record || record.version !== 2 || record.usedAt || record.revokedAt || !payment || payment.status !== 'verified' || new Date(record.expiresAt).getTime() <= Date.now()) {
+    return res.redirect('/FundingReady/payment/?access=invalid');
+  }
+  // Renaming the source is atomic: only one simultaneous redemption can remove it.
+  try { fs.renameSync(tokenPath, `${tokenPath}.used`); }
+  catch { return res.redirect('/FundingReady/payment/?access=invalid'); }
+  const session = randomToken(32);
+  const now = Date.now();
+  const sessionRecord = { version: 2, paymentId, createdAt: new Date(now).toISOString(), expiresAt: new Date(now + 30 * 86400_000).toISOString() };
+  if (!jsonWriteAtomic(path.join(SESSIONS_DIR, `session-${hashToken(session)}.json`), sessionRecord)) return res.status(500).send('Access could not be activated. Contact support.');
+  setAppCookie(res, req, 'ngo_compass_access', session, 30 * 86400_000);
+  setAppCookie(res, req, 'ngo_compass_csrf', randomToken(24), 86400_000, false);
+  return res.redirect('/FundingReady/assessment/');
+}
+
+function revokeAccessLinks(paymentId: string) {
+  for (const file of fs.readdirSync(ACCESS_DIR)) {
+    if (!/^token-[a-f0-9]{64}\.json$/.test(file)) continue;
+    const filename = path.join(ACCESS_DIR, file);
+    const record = jsonRead<any>(filename);
+    if (record?.paymentId === paymentId && !record.usedAt) {
+      record.revokedAt = new Date().toISOString();
+      jsonWriteAtomic(filename, record);
+    }
+  }
+}
+
 const app = express();
+const loginFailures = new Map<string, { count: number; until: number }>();
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.use((_req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'same-origin'); next(); });
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Handle API requests
 function handleApiGet(req: Request, res: Response) {
-  const action = cleanText(req.query.action, 40);
+  const action = req.path.endsWith('/assessments/bootstrap') || req.path.endsWith('/payments') ? 'bootstrap' : req.path.endsWith('/assessments/access') ? 'access' : /^\/(?:FundingReady\/)?api\/assessments\/[a-f0-9]{32,40}$/.test(req.path) ? 'load' : cleanText(req.query.action, 40);
 
   if (action === 'bootstrap') {
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -282,6 +359,7 @@ function handleApiGet(req: Request, res: Response) {
       access: Boolean(paymentId),
       paymentId: paymentId || '',
       orderReference: reference,
+      reviewerEmail: cleanText(process.env.REVIEWER_EMAIL, 160),
     });
   }
 
@@ -299,43 +377,21 @@ function handleApiGet(req: Request, res: Response) {
   }
 
   if (action === 'exchange') {
-    const token = cleanText(req.query.token, 128);
-    const tokenPath = path.join(ACCESS_DIR, `token-${hashToken(token)}.json`);
-    const record = jsonRead<any>(tokenPath);
-    if (!record || new Date(record.expiresAt).getTime() <= Date.now()) {
-      return res.redirect('/FundingReady/payment/?access=invalid');
-    }
-    record.usedAt = record.usedAt || new Date().toISOString();
-    record.lastAccessedAt = new Date().toISOString();
-    jsonWriteAtomic(tokenPath, record);
-
-    const session = randomToken(32);
-    const sessionRecord = {
-      paymentId: cleanText(record.paymentId, 64),
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 2592000 * 1000).toISOString(),
-    };
-    jsonWriteAtomic(path.join(SESSIONS_DIR, `session-${hashToken(session)}.json`), sessionRecord);
-
-    setAppCookie(res, req, 'ngo_compass_access', session, 2592000 * 1000, true);
-    setAppCookie(res, req, 'ngo_compass_csrf', randomToken(24), 86400 * 1000, false);
-
-    return res.redirect(`/FundingReady/assessment/?session=${encodeURIComponent(session)}`);
+    return redeemAccess(req, res, cleanText(req.query.token, 128));
   }
 
   if (action === 'load') {
-    const id = cleanText(req.query.id, 128);
-    const key = cleanText(req.query.key || req.query.respondentKey, 128);
+    const id = validId(req.params.id || req.query.id);
     const filePath = path.join(DATA_DIR, `assessment-${id}.json`);
     const record = jsonRead<any>(filePath);
     if (
-      !record ||
-      record.keyHash !== hashToken(key)
+      !record || record.paymentId !== sessionPaymentId(req)
     ) {
       return res.status(404).json({ error: 'Assessment not found.' });
     }
     const { keyHash, respondentKey, paymentId: _, ...safeAssessment } = record;
-    return res.json({ assessment: safeAssessment });
+    const payment = jsonRead<any>(path.join(PAYMENTS_DIR, `payment-${record.paymentId}.json`));
+    return res.json({ assessment: safeAssessment, receipt: record.completed ? { reference: payment?.orderReference || '', submittedAt: payment?.submittedAt || record.updatedAt, reviewStatus: payment?.reviewStatus || 'submitted', reportReady: Boolean(payment?.report?.file), reviewerScore: payment?.reviewerScore ?? null } : null });
   }
 
   return res.status(400).json({ error: 'Invalid action.' });
@@ -344,8 +400,10 @@ function handleApiGet(req: Request, res: Response) {
 function handleApiPost(req: Request, res: Response) {
   const payload = req.body || {};
   const action = cleanText(payload.action, 40);
+  if (!csrfOk(req)) return res.status(403).json({ error: 'Invalid or missing CSRF token.' });
 
   if (action === 'payment') {
+    if (!paymentSettings().available) return res.status(503).json({ error: 'Payments are not configured. Please contact support.' });
     const profile = {
       respondentName: cleanText(payload.respondentName, 120),
       ngoName: cleanText(payload.ngoName, 160),
@@ -373,6 +431,7 @@ function handleApiPost(req: Request, res: Response) {
       const randPart = crypto.randomBytes(6).toString('hex').slice(0, 10).toUpperCase();
       reference = `NGR-${dateStr}-${randPart}`;
     }
+    if (!/^NGR-\d{8}-[A-F0-9]{10}$/.test(reference)) return res.status(400).json({ error: 'Invalid payment reference.' });
 
     const orderFile = path.join(ORDERS_DIR, `order-${reference}.json`);
     let order = jsonRead<any>(orderFile);
@@ -411,12 +470,7 @@ function handleApiPost(req: Request, res: Response) {
       orderReference: reference,
       profile,
       utr,
-      proof: proof && typeof proof === 'object' ? {
-        name: cleanText(proof.name, 160),
-        type: cleanText(proof.type, 80),
-        size: Number(proof.size) || 0,
-        data: typeof proof.data === 'string' ? proof.data : '',
-      } : { name: '', type: '', size: 0, data: '' },
+      proof: null as any,
       consent: true,
       status: 'pending',
       reviewer: '',
@@ -428,87 +482,41 @@ function handleApiPost(req: Request, res: Response) {
       verifiedAt: '',
     };
 
+    if (proof) {
+      record.proof = proofFromData(proof);
+      if (!record.proof) return res.status(400).json({ error: 'Proof must be a PDF, JPEG, or PNG under 5 MB.' });
+    }
     if (!jsonWriteAtomic(path.join(PAYMENTS_DIR, `payment-${id}.json`), record)) {
+      if (record.proof) try { fs.unlinkSync(path.join(UPLOADS_DIR, record.proof.file)); } catch {}
       return res.status(500).json({ error: 'We could not record your payment details. Please try again.' });
     }
 
     order.paymentId = id;
-    jsonWriteAtomic(orderFile, order);
+    if (!jsonWriteAtomic(orderFile, order)) {
+      try { fs.unlinkSync(path.join(PAYMENTS_DIR, `payment-${id}.json`)); } catch {}
+      if (record.proof) try { fs.unlinkSync(path.join(UPLOADS_DIR, record.proof.file)); } catch {}
+      return res.status(500).json({ error: 'We could not finish recording the payment. Please try again.' });
+    }
 
     return res.status(201).json({ ok: true, paymentId: id, orderReference: reference });
   }
 
   if (action === 'start') {
-    let paymentId = sessionPaymentId(req) || cleanText(payload.paymentId || req.query.paymentId, 64);
+    const paymentId = sessionPaymentId(req);
     const profile = payload.profile || {};
-    let paymentFile = paymentId ? path.join(PAYMENTS_DIR, `payment-${paymentId}.json`) : '';
-    let payment = paymentFile ? jsonRead<any>(paymentFile) : null;
-
-    if (!payment) {
-      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const randPart = crypto.randomBytes(5).toString('hex').toUpperCase();
-      const newPayId = crypto.randomBytes(18).toString('hex');
-      const reference = `APP-${dateStr}-${randPart}`;
-      const now = new Date().toISOString();
-      const newPayment = {
-        id: newPayId,
-        orderReference: reference,
-        profile: {
-          respondentName: cleanText(profile.respondentName, 120),
-          ngoName: cleanText(profile.ngoName, 160),
-          email: cleanText(profile.email, 160).toLowerCase(),
-          phoneNumber: cleanText(profile.phoneNumber, 40),
-          position: cleanText(profile.position, 120),
-        },
-        utr: '',
-        proof: { name: '', type: '', size: 0, data: '' },
-        consent: false,
-        status: 'verified',
-        reviewer: '',
-        reportDueAt: '',
-        reportSentAt: '',
-        assessmentId: '',
-        createdAt: now,
-        updatedAt: now,
-        verifiedAt: now,
-        directAccess: true,
-      };
-      jsonWriteAtomic(path.join(PAYMENTS_DIR, `payment-${newPayId}.json`), newPayment);
-      paymentId = newPayId;
-      paymentFile = path.join(PAYMENTS_DIR, `payment-${newPayId}.json`);
-      payment = newPayment;
-
-      const session = randomToken(32);
-      const sessionRecord = {
-        paymentId: newPayId,
-        createdAt: now,
-        expiresAt: new Date(Date.now() + 2592000 * 1000).toISOString(),
-      };
-      jsonWriteAtomic(path.join(SESSIONS_DIR, `session-${hashToken(session)}.json`), sessionRecord);
-      setAppCookie(res, req, 'ngo_compass_access', session, 2592000 * 1000, true);
-    } else if (payment.status !== 'verified') {
-      payment.status = 'verified';
-      payment.verifiedAt = payment.verifiedAt || new Date().toISOString();
-      jsonWriteAtomic(paymentFile, payment);
-    }
+    const paymentFile = paymentId ? path.join(PAYMENTS_DIR, `payment-${paymentId}.json`) : '';
+    const payment = paymentFile ? jsonRead<any>(paymentFile) : null;
+    if (!payment || payment.status !== 'verified') return res.status(403).json({ error: 'Verified assessment access is required.' });
 
     // If an assessment has already been started for this payment, return existing id & key
     if (payment.assessmentId) {
       const existing = jsonRead<any>(path.join(DATA_DIR, `assessment-${payment.assessmentId}.json`));
       if (existing) {
-        let key = existing.respondentKey;
-        if (!key) {
-          key = crypto.randomBytes(32).toString('hex');
-          existing.respondentKey = key;
-          existing.keyHash = hashToken(key);
-          jsonWriteAtomic(path.join(DATA_DIR, `assessment-${payment.assessmentId}.json`), existing);
-        }
-        return res.json({ id: existing.id, respondentKey: key });
+        return res.json({ id: existing.id, revision: existing.revision || 0 });
       }
     }
 
     const id = crypto.randomBytes(16).toString('hex');
-    const key = crypto.randomBytes(32).toString('hex');
     const now = new Date().toISOString();
     const defaultProfile = payment?.profile || {};
 
@@ -523,12 +531,13 @@ function handleApiPost(req: Request, res: Response) {
         position: cleanText(profile.position || defaultProfile.position, 120),
       },
       answers: {},
+      naReasons: {},
       currentStep: 0,
       completed: false,
       createdAt: now,
       updatedAt: now,
-      keyHash: hashToken(key),
-      respondentKey: key,
+      revision: 0,
+      schemaVersion: SCHEMA_VERSION,
     };
 
     if (!jsonWriteAtomic(path.join(DATA_DIR, `assessment-${id}.json`), record)) {
@@ -537,14 +546,16 @@ function handleApiPost(req: Request, res: Response) {
 
     payment.assessmentId = id;
     payment.updatedAt = now;
-    jsonWriteAtomic(paymentFile, payment);
+    if (!jsonWriteAtomic(paymentFile, payment)) {
+      try { fs.unlinkSync(path.join(DATA_DIR, `assessment-${id}.json`)); } catch {}
+      return res.status(500).json({ error: 'Unable to start the assessment.' });
+    }
 
-    return res.json({ id, respondentKey: key });
+    return res.json({ id, revision: 0 });
   }
 
   if (action === 'save') {
-    const id = cleanText(payload.id, 128);
-    const key = cleanText(payload.key || payload.respondentKey, 128);
+    const id = validId(payload.id);
     const draft = payload.draft;
     const filePath = path.join(DATA_DIR, `assessment-${id}.json`);
     const record = jsonRead<any>(filePath);
@@ -554,36 +565,23 @@ function handleApiPost(req: Request, res: Response) {
       !draft.profile ||
       !draft.answers ||
       !record ||
-      record.keyHash !== hashToken(key)
+      record.paymentId !== sessionPaymentId(req)
     ) {
       return res.status(400).json({ error: 'Invalid assessment data.' });
     }
 
-    const allowed = new Set(['yes', 'no', 'not_sure', 'not_applicable']);
-    const filteredAnswers: Record<string, string> = {};
-    for (const [k, v] of Object.entries(draft.answers || {})) {
-      if (typeof v === 'string') {
-        if (allowed.has(v)) {
-          filteredAnswers[k] = v;
-        } else if (k === 'q65a' || k === 'websiteUrl' || k === 'driveLink') {
-          filteredAnswers[k] = cleanText(v, 1000);
-        }
-      }
-    }
-
-    record.profile = {
-      respondentName: cleanText(draft.profile.respondentName || record.profile?.respondentName, 120),
-      ngoName: cleanText(draft.profile.ngoName || record.profile?.ngoName, 160),
-      email: cleanText(draft.profile.email || record.profile?.email, 160).toLowerCase(),
-      phoneNumber: cleanText(draft.profile.phoneNumber || record.profile?.phoneNumber, 40),
-      position: cleanText(draft.profile.position || record.profile?.position, 120),
-    };
-    record.answers = { ...(record.answers || {}), ...filteredAnswers };
-    record.websiteUrl = cleanText(draft.websiteUrl || draft.answers?.q65a || record.websiteUrl, 1000);
-    record.driveLink = cleanText(draft.driveLink || draft.answers?.driveLink || record.driveLink, 1000);
+    if (record.completed) return res.status(409).json({ error: 'Submitted assessments cannot be edited.' });
+    if (!Number.isInteger(payload.revision) || payload.revision !== (record.revision || 0)) return res.status(409).json({ error: 'This draft changed in another tab. Reload and reconcile your answers.', revision: record.revision || 0 });
+    const validated = validateDraft(draft, draft.completed === true);
+    if (Object.keys(validated.errors).length) return res.status(422).json({ error: 'Please correct the highlighted fields.', fields: validated.errors });
+    record.profile = validated.draft!.profile;
+    record.answers = validated.draft!.answers;
+    record.naReasons = validated.draft!.naReasons;
     record.currentStep = Math.max(0, Math.min(120, Number(draft.currentStep) || 0));
     record.currentStepId = cleanText(draft.currentStepId, 40);
-    record.completed = Boolean(draft.completed);
+    record.completed = draft.completed === true;
+    record.revision = (record.revision || 0) + 1;
+    record.schemaVersion = SCHEMA_VERSION;
     record.updatedAt = new Date().toISOString();
 
     if (!jsonWriteAtomic(filePath, record)) {
@@ -601,6 +599,8 @@ function handleApiPost(req: Request, res: Response) {
         }
         if (record.completed && !payment.submittedAt) {
           payment.submittedAt = new Date().toISOString();
+          payment.reviewStatus = 'submitted';
+          payment.reviewHistory = [...(payment.reviewHistory || []), { status: 'submitted', by: 'applicant', at: payment.submittedAt }];
           changed = true;
         }
         if (changed) {
@@ -610,7 +610,8 @@ function handleApiPost(req: Request, res: Response) {
       }
     }
 
-    return res.json({ ok: true });
+    const currentPayment = record.completed ? jsonRead<any>(path.join(PAYMENTS_DIR, `payment-${record.paymentId}.json`)) : null;
+    return res.json({ ok: true, revision: record.revision, submittedAt: record.completed ? record.updatedAt : '', reference: currentPayment?.orderReference || '' });
   }
 
   return res.status(400).json({ error: 'Invalid request.' });
@@ -619,31 +620,36 @@ function handleApiPost(req: Request, res: Response) {
 // API Routes
 app.get(['/FundingReady/api.php', '/api.php', '/FundingReady/api', '/api'], handleApiGet);
 app.post(['/FundingReady/api.php', '/api.php', '/FundingReady/api', '/api'], handleApiPost);
+app.get(['/api/payments', '/FundingReady/api/payments'], (req, res) => { req.query.action = 'bootstrap'; return handleApiGet(req, res); });
+app.get(['/api/payments/status', '/FundingReady/api/payments/status'], (req, res) => {
+  const reference = cleanText(req.query.reference, 64);
+  if (!/^NGR-\d{8}-[A-F0-9]{10}$/.test(reference)) return res.status(400).json({ error: 'Invalid reference.' });
+  const order = jsonRead<any>(path.join(ORDERS_DIR, `order-${reference}.json`));
+  const payment = order?.paymentId && jsonRead<any>(path.join(PAYMENTS_DIR, `payment-${validId(order.paymentId)}.json`));
+  if (!payment || payment.orderReference !== reference) return res.status(404).json({ error: 'Reference not found.' });
+  return res.json({ reference, status: payment.status, submittedAt: payment.createdAt });
+});
+app.post(['/api/payments', '/FundingReady/api/payments'], (req, res) => { req.body.action = 'payment'; return handleApiPost(req, res); });
+app.get(['/api/assessments/bootstrap', '/FundingReady/api/assessments/bootstrap'], (req, res) => { req.query.action = 'bootstrap'; return handleApiGet(req, res); });
+app.get(['/api/assessments/access', '/FundingReady/api/assessments/access'], (req, res) => { req.query.action = 'access'; return handleApiGet(req, res); });
+app.post(['/api/assessments', '/FundingReady/api/assessments'], (req, res) => { req.body.action = 'start'; req.body.profile = req.body.profile || req.body; return handleApiPost(req, res); });
+app.get(['/api/assessments/:id', '/FundingReady/api/assessments/:id'], (req, res) => { req.query.action = 'load'; req.query.id = req.params.id; return handleApiGet(req, res); });
+app.patch(['/api/assessments/:id', '/FundingReady/api/assessments/:id'], (req, res) => { req.body.action = 'save'; req.body.id = req.params.id; return handleApiPost(req, res); });
+app.delete(['/api/assessments/:id', '/FundingReady/api/assessments/:id'], (req, res) => {
+  if (!csrfOk(req)) return res.status(403).json({ error: 'Invalid or missing CSRF token.' });
+  const id = validId(req.params.id);
+  const file = path.join(DATA_DIR, `assessment-${id}.json`);
+  const record = jsonRead<any>(file);
+  if (!record || record.paymentId !== sessionPaymentId(req)) return res.status(403).json({ error: 'Access denied.' });
+  if (record.completed) return res.status(409).json({ error: 'Submitted assessments cannot be cleared.' });
+  record.answers = {}; record.currentStep = 0; record.revision = (record.revision || 0) + 1; record.updatedAt = new Date().toISOString();
+  if (!jsonWriteAtomic(file, record)) return res.status(500).json({ error: 'Unable to clear draft.' });
+  return res.json({ ok: true, revision: record.revision, assessment: record });
+});
 
 // Access Token Direct URL
 app.get(['/FundingReady/access/:token', '/access/:token'], (req: Request, res: Response) => {
-  const token = req.params.token;
-  const tokenPath = path.join(ACCESS_DIR, `token-${hashToken(token)}.json`);
-  const record = jsonRead<any>(tokenPath);
-  if (!record || new Date(record.expiresAt).getTime() <= Date.now()) {
-    return res.redirect('/FundingReady/payment/?access=invalid');
-  }
-  record.usedAt = record.usedAt || new Date().toISOString();
-  record.lastAccessedAt = new Date().toISOString();
-  jsonWriteAtomic(tokenPath, record);
-
-  const session = randomToken(32);
-  const sessionRecord = {
-    paymentId: cleanText(record.paymentId, 64),
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 2592000 * 1000).toISOString(),
-  };
-  jsonWriteAtomic(path.join(SESSIONS_DIR, `session-${hashToken(session)}.json`), sessionRecord);
-
-  setAppCookie(res, req, 'ngo_compass_access', session, 2592000 * 1000, true);
-  setAppCookie(res, req, 'ngo_compass_csrf', randomToken(24), 86400 * 1000, false);
-
-  return res.redirect(`/FundingReady/assessment/?session=${encodeURIComponent(session)}`);
+  return redeemAccess(req, res, cleanText(req.params.token, 128));
 });
 
 // Admin Proof View
@@ -651,22 +657,9 @@ app.get(['/FundingReady/admin/proof/:id', '/admin/proof/:id'], (req: Request, re
   if (!isAdminLoggedIn(req)) {
     return res.status(403).send('Unauthorized. Sign in to admin first.');
   }
-  const id = cleanText(req.params.id, 64);
+  const id = validId(req.params.id);
   const payment = jsonRead<any>(path.join(PAYMENTS_DIR, `payment-${id}.json`));
-  if (!payment || !payment.proof || !payment.proof.data) {
-    return res.status(404).send('No proof found for this submission.');
-  }
-
-  const dataUri = payment.proof.data;
-  const match = dataUri.match(/^data:([^;]+);base64,(.+)$/);
-  if (match) {
-    const contentType = match[1];
-    const buffer = Buffer.from(match[2], 'base64');
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(payment.proof.name || 'proof')}"`);
-    return res.send(buffer);
-  }
-  return res.redirect(dataUri);
+  return sendProtectedFile(res, payment?.proof);
 });
 
 // Admin Panel Render
@@ -775,7 +768,7 @@ textarea{resize:vertical}
   if (!isLoggedIn) {
     return `${head}<main class="wrap"><section class="card login"><img src="/FundingReady/ngo-compass-logo.png" alt="NGO Compass"><p class="eyebrow">Private workspace</p><h1>Admin sign in</h1><p class="muted">Review payments, issue assessment access and track reports.</p>${
       error ? `<p class="error">${escapeHtml(error)}</p>` : ''
-    }<form method="post"><input type="hidden" name="csrf" value="${escapeHtml(csrfToken)}"><label for="email">Email</label><input id="email" type="email" name="email" value="${escapeHtml(ADMIN_EMAIL)}" autocomplete="username" required><label for="password">Password</label><input id="password" type="password" name="password" autocomplete="current-password" required><p class="help">Default credentials: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}</p><p><button name="login" value="1">Sign in</button></p></form></section></main></body></html>`;
+    }<form method="post"><input type="hidden" name="csrf" value="${escapeHtml(csrfToken)}"><label for="email">Email</label><input id="email" type="email" name="email" autocomplete="username" required><label for="password">Password</label><input id="password" type="password" name="password" autocomplete="current-password" required><p><button name="login" value="1">Sign in</button></p></form></section></main></body></html>`;
   }
 
   let body = `${head}<main class="wrap"><section class="card"><header class="header"><div><img src="/FundingReady/ngo-compass-logo.png" alt="NGO Compass"><p class="eyebrow">Private workspace</p><h1>Funding readiness operations</h1><p class="muted">${records.length} payment submission(s) · ${assessments.length} assessment response(s)</p></div><form method="post"><input type="hidden" name="csrf" value="${escapeHtml(csrfToken)}"><button class="secondary" name="logout" value="1">Log out</button></form></header>`;
@@ -803,15 +796,16 @@ textarea{resize:vertical}
     const manual = Boolean(record.manual) || String(record.orderReference || '').startsWith('MANUAL-');
     const proof = record.proof || {};
 
-    body += `<details class="row"><summary><div><strong>${escapeHtml(prof.ngoName || 'Unnamed NGO')}${manual ? ' <span class="manual-badge">Manual access</span>' : ''}</strong><span>${escapeHtml(prof.respondentName || '')} · ${escapeHtml(prof.email || '')} · Ref ${escapeHtml(record.orderReference || '')} · ${manual ? 'No payment recorded' : `UTR ${escapeHtml(record.utr || '')}`}</span></div><span class="status ${status === 'verified' ? 'verified' : 'pending'}">${manual ? 'Manual · Verified' : status === 'verified' ? 'Verified' : 'Pending'}</span></summary><div class="details"><p class="meta">Created ${escapeHtml(record.createdAt || '')} · Updated ${escapeHtml(record.updatedAt || '')}</p><div class="payment-grid"><div><span>Mobile</span><strong>${escapeHtml(prof.phoneNumber || '')}</strong></div><div><span>${manual ? 'Payment' : 'Proof'}</span>${manual ? '<strong>Manual access — no payment recorded</strong>' : proof.data ? `<a href="/FundingReady/admin/proof/${escapeHtml(id)}" target="_blank" rel="noopener noreferrer">View ${escapeHtml(proof.name || 'proof')}</a>` : '<strong>Not provided</strong>'}</div><div><span>Verified at</span><strong>${escapeHtml(record.verifiedAt || '—')}</strong></div><div><span>Payment ID</span><strong>${escapeHtml(id)}</strong></div></div>`;
+    body += `<details class="row"><summary><div><strong>${escapeHtml(prof.ngoName || 'Unnamed NGO')}${manual ? ' <span class="manual-badge">Manual access</span>' : ''}</strong><span>${escapeHtml(prof.respondentName || '')} · ${escapeHtml(prof.email || '')} · Ref ${escapeHtml(record.orderReference || '')} · ${manual ? 'No payment recorded' : `UTR ${escapeHtml(record.utr || '')}`}</span></div><span class="status ${status === 'verified' ? 'verified' : 'pending'}">${manual ? 'Manual · Verified' : status === 'verified' ? 'Verified' : 'Pending'}</span></summary><div class="details"><p class="meta">Created ${escapeHtml(record.createdAt || '')} · Updated ${escapeHtml(record.updatedAt || '')}</p><div class="payment-grid"><div><span>Mobile</span><strong>${escapeHtml(prof.phoneNumber || '')}</strong></div><div><span>${manual ? 'Payment' : 'Proof'}</span>${manual ? '<strong>Manual access — no payment recorded</strong>' : proof.file ? `<a href="/FundingReady/admin/proof/${escapeHtml(id)}">Download proof</a>` : '<strong>Not provided</strong>'}</div><div><span>Verified at</span><strong>${escapeHtml(record.verifiedAt || '—')}</strong></div><div><span>Payment ID</span><strong>${escapeHtml(id)}</strong></div></div>`;
 
-    if (status !== 'verified') {
+    if (status === 'pending') {
       body += `<form method="post"><input type="hidden" name="csrf" value="${escapeHtml(csrfToken)}"><input type="hidden" name="payment_id" value="${escapeHtml(id)}"><button name="verify_payment" value="1">Verify payment and create access link</button></form>`;
-    } else {
+      if (status === 'pending') body += `<form method="post"><input type="hidden" name="csrf" value="${escapeHtml(csrfToken)}"><input type="hidden" name="payment_id" value="${escapeHtml(id)}"><button class="secondary" name="reject_payment" value="1">Reject payment submission</button></form>`;
+    } else if (status === 'verified') {
       body += `<form method="post"><input type="hidden" name="csrf" value="${escapeHtml(csrfToken)}"><input type="hidden" name="payment_id" value="${escapeHtml(id)}"><button class="secondary" name="reissue_access" value="1">Re-issue access link</button></form>`;
     }
 
-    body += `<form method="post" class="actions" style="margin-top:18px"><input type="hidden" name="csrf" value="${escapeHtml(csrfToken)}"><input type="hidden" name="payment_id" value="${escapeHtml(id)}"><div><label>Reviewer</label><input name="reviewer" value="${escapeHtml(record.reviewer || '')}" placeholder="Assign reviewer"></div><div><label>Report due</label><input type="date" name="reportDueAt" value="${escapeHtml((record.reportDueAt || '').slice(0, 10))}"></div><label class="report-sent"><input type="checkbox" name="report_sent_state" value="1"${record.reportSentAt ? ' checked' : ''}> Report sent</label><button name="update_payment" value="1">Save status</button></form></div></details>`;
+    body += `<form method="post" class="actions" style="margin-top:18px"><input type="hidden" name="csrf" value="${escapeHtml(csrfToken)}"><input type="hidden" name="payment_id" value="${escapeHtml(id)}"><div><label>Reviewer</label><input name="reviewer" value="${escapeHtml(record.reviewer || '')}" placeholder="Assign reviewer"></div><div><label>Evidence review</label><select name="evidenceStatus"><option value="not_started">Not started</option><option value="in_progress"${record.evidenceStatus === 'in_progress' ? ' selected' : ''}>In progress</option><option value="complete"${record.evidenceStatus === 'complete' ? ' selected' : ''}>Complete</option></select></div><div><label>Review state</label><select name="reviewStatus"><option value="submitted">Submitted</option><option value="in_review"${record.reviewStatus === 'in_review' ? ' selected' : ''}>In review</option><option value="report_ready"${record.reviewStatus === 'report_ready' ? ' selected' : ''}>Report ready</option><option value="delivered"${record.reviewStatus === 'delivered' ? ' selected' : ''}>Delivered</option></select></div><div><label>Reviewer score (optional)</label><input type="number" min="0" max="100" name="reviewerScore" value="${escapeHtml(record.reviewerScore ?? '')}"></div><div><label>Internal notes</label><textarea name="internalNotes" maxlength="4000">${escapeHtml(record.internalNotes || '')}</textarea></div><button name="update_payment" value="1">Save review</button></form><div><label for="report-${escapeHtml(id)}">Reviewed PDF report</label><input id="report-${escapeHtml(id)}" type="file" accept="application/pdf" data-report="${escapeHtml(id)}"><button type="button" class="upload-report" data-payment="${escapeHtml(id)}">Upload PDF</button>${record.report?.file ? `<a href="/FundingReady/admin/report/${escapeHtml(id)}">Download current report</a>` : ''}</div><p class="meta">${escapeHtml(record.reviewStatus || 'Awaiting submission')} · ${escapeHtml(record.report?.uploadedAt || '')}</p></div></details>`;
   }
 
   body += `<section class="section-title"><p class="eyebrow">Assessment responses</p><h2>${assessments.length} saved assessment${assessments.length === 1 ? '' : 's'}</h2></section>`;
@@ -827,17 +821,19 @@ textarea{resize:vertical}
 
     const websiteUrl = record.websiteUrl || answers.q65a || '';
     const driveLink = record.driveLink || answers.driveLink || '';
+    const evidenceUrl = /^https:\/\/[A-Za-z0-9.-]+(?:\/|$)/.test(prof.evidenceUrl || '') ? prof.evidenceUrl : '';
 
     body += `<details class="row"><summary><div><strong>${escapeHtml(prof.ngoName || 'Unnamed NGO')}</strong><span>${escapeHtml(prof.respondentName || '')} · ${escapeHtml(prof.position || '')} · ${escapeHtml(prof.email || '')}</span></div><span class="status ${complete ? 'verified' : 'pending'}">${complete ? 'Complete' : 'In progress'}</span></summary><div class="details"><p class="meta">Last saved ${escapeHtml(record.updatedAt || '')} · ${Object.keys(answers).filter(k => k.startsWith('q') && !k.endsWith('a')).length}/89 compliance checks answered</p>`;
 
-    if (websiteUrl || driveLink) {
+    if (websiteUrl || driveLink || evidenceUrl) {
       body += `<div class="payment-grid" style="margin-bottom:16px">`;
-      if (websiteUrl) {
+      if (/^https:\/\/[A-Za-z0-9.-]+(?:\/|$)/.test(websiteUrl)) {
         body += `<div><span>Website URL</span><strong><a href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(websiteUrl)} ↗</a></strong></div>`;
       }
       if (driveLink) {
-        body += `<div><span>Google Drive Folder</span><strong><a href="${escapeHtml(driveLink)}" target="_blank" rel="noopener noreferrer" style="color:#0b7344;font-weight:700">📂 Open Drive Folder ↗</a></strong></div>`;
+        body += `<div><span>Legacy evidence link</span><strong>Ask applicant to confirm restricted access</strong></div>`;
       }
+      if (evidenceUrl) body += `<div><span>Restricted evidence link</span><strong><a href="${escapeHtml(evidenceUrl)}" target="_blank" rel="noopener noreferrer">Open evidence ↗</a></strong></div>`;
       body += `</div>`;
     }
 
@@ -872,6 +868,17 @@ document.getElementById("generate-qr")?.addEventListener("click", () => {
     if (out) out.innerHTML = \`<img src="\${src}" alt="Generated payment QR">\`;
   });
 });
+document.querySelectorAll(".upload-report").forEach(button => button.addEventListener("click", async () => {
+  const id = button.dataset.payment;
+  const file = document.getElementById("report-" + id)?.files?.[0];
+  if (!file || file.type !== "application/pdf" || file.size > 10000000) { alert("Choose a PDF under 10 MB."); return; }
+  button.disabled = true;
+  try {
+    const response = await fetch("/FundingReady/admin/report/" + id, {method: "POST", credentials: "same-origin", headers: {"content-type": "application/pdf", "x-csrf-token": "${escapeHtml(csrfToken)}"}, body: file});
+    if (!response.ok) throw Error(await response.text());
+    location.reload();
+  } catch (error) { alert(error.message || "Upload failed."); button.disabled = false; }
+}));
 </script></body></html>`;
 
   return body;
@@ -881,14 +888,16 @@ document.getElementById("generate-qr")?.addEventListener("click", () => {
 function handleAdminGet(req: Request, res: Response) {
   const isLoggedIn = isAdminLoggedIn(req);
 
-  const csrf = randomToken(16);
+  const csrf = randomToken(24);
   setAppCookie(res, req, 'ngo_compass_admin_csrf', csrf, 7200 * 1000, true);
+  req.cookies['ngo_compass_admin_csrf'] = csrf;
 
   const query = cleanText(req.query.q, 120);
   const filter = cleanText(req.query.status, 30) || 'all';
 
   const html = renderAdminHtml({
     isLoggedIn,
+    error: !isLoggedIn && (!ADMIN_EMAIL || !ADMIN_PASSWORD) ? 'Admin login is unavailable: configure ADMIN_EMAIL and ADMIN_PASSWORD.' : '',
     query,
     filter,
     req,
@@ -899,6 +908,7 @@ function handleAdminGet(req: Request, res: Response) {
 }
 
 function handleAdminPost(req: Request, res: Response) {
+  if (!adminCsrfOk(req)) return res.status(403).send('Invalid or missing CSRF token. Reload the admin page.');
   let error = '';
   let notice = '';
   let oneTimeLink = '';
@@ -908,15 +918,23 @@ function handleAdminPost(req: Request, res: Response) {
   if ('login' in body || body.action === 'login') {
     const email = cleanText(body.email, 160).toLowerCase();
     const password = String(body.password || '');
-
-    if (email === ADMIN_EMAIL && (password === ADMIN_PASSWORD || password === 'admin123' || password === '@Illuminous42')) {
+    if (!ADMIN_EMAIL || !ADMIN_PASSWORD) return res.status(503).send('Admin login is unavailable: configure ADMIN_EMAIL and ADMIN_PASSWORD.');
+    const address = req.ip || 'unknown';
+    const attempt = loginFailures.get(address) || { count: 0, until: 0 };
+    if (attempt.until > Date.now()) return res.status(429).send('Too many login attempts. Try again later.');
+    if (email === ADMIN_EMAIL && safeEqual(password, ADMIN_PASSWORD)) {
+      destroyAdminSession(req, res);
+      loginFailures.delete(address);
       createAdminSession(res, req);
       return res.redirect('/FundingReady/admin');
     } else {
+      attempt.count++;
+      if (attempt.count >= 5) { attempt.count = 0; attempt.until = Date.now() + 15 * 60_000; }
+      loginFailures.set(address, attempt);
       error = 'Incorrect email or password.';
       const html = renderAdminHtml({ isLoggedIn: false, error, req });
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      return res.send(html);
+      return res.status(401).send(html);
     }
   }
 
@@ -932,10 +950,10 @@ function handleAdminPost(req: Request, res: Response) {
   if ('save_settings' in body || body.action === 'save_settings') {
     const current = paymentSettings();
     const nextSettings = {
-      payeeName: cleanText(body.payeeName, 160) || current.payeeName,
-      upiId: cleanText(body.upiId, 160) || current.upiId,
+      payeeName: cleanText(body.payeeName, 160),
+      upiId: cleanText(body.upiId, 160),
       upiPhone: cleanText(body.upiPhone, 40),
-      qrDataUrl: cleanText(body.qrDataUrl, 2000000) || current.qrDataUrl,
+      qrDataUrl: cleanText(body.qrDataUrl, 2000000),
       updatedAt: new Date().toISOString(),
     };
     if (jsonWriteAtomic(SETTINGS_FILE, nextSettings)) {
@@ -979,6 +997,7 @@ function handleAdminPost(req: Request, res: Response) {
       };
 
       const accessRecord = {
+        version: 2,
         paymentId: id,
         tokenHash: hashToken(token),
         createdAt: now,
@@ -995,18 +1014,23 @@ function handleAdminPost(req: Request, res: Response) {
   }
 
   if ('verify_payment' in body || body.action === 'verify_payment' || 'reissue_access' in body || body.action === 'reissue_access') {
-    const id = cleanText(body.payment_id, 64);
+    const id = validId(body.payment_id);
     const paymentFile = path.join(PAYMENTS_DIR, `payment-${id}.json`);
     const record = jsonRead<any>(paymentFile);
 
     if (!record) {
       error = 'Payment record not found.';
+    } else if ('verify_payment' in body && record.status !== 'pending') {
+      error = 'Only pending payments may be verified.';
+    } else if ('reissue_access' in body && record.status !== 'verified') {
+      error = 'Verify the payment before issuing access.';
     } else {
       const token = randomToken(32);
       const now = new Date().toISOString();
       const expiresAt = new Date(Date.now() + 2592000 * 1000).toISOString();
 
       const accessRecord = {
+        version: 2,
         paymentId: id,
         tokenHash: hashToken(token),
         createdAt: now,
@@ -1014,6 +1038,7 @@ function handleAdminPost(req: Request, res: Response) {
         usedAt: '',
       };
 
+      revokeAccessLinks(id);
       jsonWriteAtomic(path.join(ACCESS_DIR, `token-${hashToken(token)}.json`), accessRecord);
 
       record.status = 'verified';
@@ -1026,8 +1051,16 @@ function handleAdminPost(req: Request, res: Response) {
     }
   }
 
+  if ('reject_payment' in body || body.action === 'reject_payment') {
+    const id = validId(body.payment_id);
+    const file = path.join(PAYMENTS_DIR, `payment-${id}.json`);
+    const record = jsonRead<any>(file);
+    if (!record || record.status !== 'pending') error = 'Only pending payments may be rejected.';
+    else { record.status = 'rejected'; record.updatedAt = new Date().toISOString(); if (jsonWriteAtomic(file, record)) notice = 'Submission rejected.'; else error = 'Unable to update payment.'; }
+  }
+
   if ('update_payment' in body || body.action === 'update_payment') {
-    const id = cleanText(body.payment_id, 64);
+    const id = validId(body.payment_id);
     const paymentFile = path.join(PAYMENTS_DIR, `payment-${id}.json`);
     const record = jsonRead<any>(paymentFile);
 
@@ -1035,12 +1068,24 @@ function handleAdminPost(req: Request, res: Response) {
       error = 'Payment record not found.';
     } else {
       record.reviewer = cleanText(body.reviewer, 120);
-      const due = cleanText(body.reportDueAt, 40);
-      record.reportDueAt = /^\d{4}-\d{2}-\d{2}$/.test(due) ? due : '';
-      record.reportSentAt = body.report_sent_state === '1' ? record.reportSentAt || new Date().toISOString() : '';
+      record.evidenceStatus = ['not_started','in_progress','complete'].includes(body.evidenceStatus) ? body.evidenceStatus : 'not_started';
+      record.internalNotes = cleanText(body.internalNotes, 4000);
+      const score = body.reviewerScore === '' ? null : Number(body.reviewerScore);
+      if (score !== null && (!Number.isInteger(score) || score < 0 || score > 100)) error = 'Score must be between 0 and 100.';
+      else record.reviewerScore = score;
+      const nextStatus = cleanText(body.reviewStatus, 32);
+      const allowedStatus = ['submitted', 'in_review', 'report_ready', 'delivered'];
+      if (!allowedStatus.includes(nextStatus)) error = 'Invalid review state.';
+      else if (!record.submittedAt && nextStatus !== 'submitted') error = 'Wait for assessment submission.';
+      else if (['report_ready', 'delivered'].includes(nextStatus) && !record.report?.file) error = 'Upload the reviewed PDF first.';
+      else if (nextStatus === 'delivered' && !(record.downloadHistory || []).length) error = 'Delivered is recorded after applicant download.';
+      else if (record.reviewStatus !== nextStatus) {
+        record.reviewStatus = nextStatus;
+        record.reviewHistory = [...(record.reviewHistory || []), { status: nextStatus, by: ADMIN_EMAIL, at: new Date().toISOString() }];
+      }
       record.updatedAt = new Date().toISOString();
-      jsonWriteAtomic(paymentFile, record);
-      notice = 'Payment record updated.';
+      if (!error && jsonWriteAtomic(paymentFile, record)) notice = 'Review updated.';
+      else if (!error) error = 'Unable to save review.';
     }
   }
 
@@ -1057,6 +1102,51 @@ function handleAdminPost(req: Request, res: Response) {
 
 app.get(['/FundingReady/admin', '/FundingReady/admin/', '/admin', '/admin/'], handleAdminGet);
 app.post(['/FundingReady/admin', '/FundingReady/admin/', '/admin', '/admin/'], handleAdminPost);
+app.post(['/FundingReady/admin/report/:id', '/admin/report/:id'], express.raw({ type: 'application/pdf', limit: '10mb' }), (req, res) => {
+  if (!isAdminLoggedIn(req) || !adminCsrfOk(req)) return res.status(403).send('Access denied.');
+  const id = validId(req.params.id);
+  const paymentFile = path.join(PAYMENTS_DIR, `payment-${id}.json`);
+  const payment = jsonRead<any>(paymentFile);
+  if (!payment || !payment.submittedAt) return res.status(404).send('Submitted assessment not found.');
+  const bytes = req.body;
+  if (!Buffer.isBuffer(bytes) || bytes.length < 5 || bytes.length > 10_000_000 || bytes.subarray(0,5).toString() !== '%PDF-') return res.status(400).send('Only PDF reports under 10 MB are accepted.');
+  const file = `${crypto.randomBytes(20).toString('hex')}.pdf`;
+  try { fs.writeFileSync(path.join(UPLOADS_DIR, file), bytes, { flag: 'wx', mode: 0o600 }); }
+  catch { return res.status(500).send('Upload failed.'); }
+  const prior = payment.report?.file;
+  payment.report = { file, type: 'application/pdf', size: bytes.length, uploadedAt: new Date().toISOString(), uploadedBy: ADMIN_EMAIL };
+  payment.reviewStatus = 'report_ready';
+  payment.reviewHistory = [...(payment.reviewHistory || []), { status: 'report_ready', by: ADMIN_EMAIL, at: payment.report.uploadedAt }];
+  if (!jsonWriteAtomic(paymentFile, payment)) { fs.unlinkSync(path.join(UPLOADS_DIR, file)); return res.status(500).send('Upload failed.'); }
+  if (prior && /^[a-f0-9]{40}\.pdf$/.test(prior)) try { fs.unlinkSync(path.join(UPLOADS_DIR, prior)); } catch {}
+  return res.json({ ok: true });
+});
+app.get(['/FundingReady/admin/report/:id', '/admin/report/:id'], (req, res) => {
+  if (!isAdminLoggedIn(req)) return res.status(403).send('Access denied.');
+  const payment = jsonRead<any>(path.join(PAYMENTS_DIR, `payment-${validId(req.params.id)}.json`));
+  return sendProtectedFile(res, payment?.report);
+});
+app.get(['/api/assessments/:id/report', '/FundingReady/api/assessments/:id/report'], (req, res) => {
+  const assessment = jsonRead<any>(path.join(DATA_DIR, `assessment-${validId(req.params.id)}.json`));
+  if (!assessment || assessment.paymentId !== sessionPaymentId(req) || !assessment.completed) return res.status(403).send('Access denied.');
+  const paymentFile = path.join(PAYMENTS_DIR, `payment-${assessment.paymentId}.json`);
+  const payment = jsonRead<any>(paymentFile);
+  if (!payment?.report?.file || !/^[a-f0-9]{40}\.pdf$/.test(payment.report.file)) return res.status(404).send('Report is not ready.');
+  const file = path.join(UPLOADS_DIR, payment.report.file);
+  if (!fs.existsSync(file)) return res.status(404).send('Report is not ready.');
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${payment.report.file}"`);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.sendFile(file, error => {
+    if (error) { if (!res.headersSent) res.status(500).end(); return; }
+    payment.downloadHistory = [...(payment.downloadHistory || []), { at: new Date().toISOString(), by: 'applicant' }];
+    if (payment.reviewStatus !== 'delivered') {
+      payment.reviewStatus = 'delivered';
+      payment.reviewHistory = [...(payment.reviewHistory || []), { status: 'delivered', by: 'applicant download', at: new Date().toISOString() }];
+    }
+    jsonWriteAtomic(paymentFile, payment);
+  });
+});
 
 // Static assets
 app.use('/FundingReady/assets', express.static(path.join(SITE_DIR, 'assets')));
@@ -1105,19 +1195,12 @@ app.use((req: Request, res: Response) => {
   res.redirect(`/FundingReady${req.path}${query}`);
 });
 
-const PRIMARY_PORT = 3000;
-const ENV_PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-
-app.listen(PRIMARY_PORT, '0.0.0.0', () => {
-  console.log(`NGO Compass Funding Ready dev server running on http://0.0.0.0:${PRIMARY_PORT}`);
+app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {
+  if (res.headersSent) return;
+  const status = error?.status === 413 ? 413 : 500;
+  res.status(status).json({ error: status === 413 ? 'Upload or request is too large.' : 'Request could not be processed.' });
 });
 
-if (ENV_PORT !== PRIMARY_PORT && !isNaN(ENV_PORT)) {
-  try {
-    app.listen(ENV_PORT, '0.0.0.0', () => {
-      console.log(`NGO Compass Funding Ready dev server also running on http://0.0.0.0:${ENV_PORT}`);
-    });
-  } catch (err) {
-    console.warn(`Could not listen on port ${ENV_PORT}:`, err);
-  }
-}
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Funding Ready server listening on port ${PORT}`);
+});
