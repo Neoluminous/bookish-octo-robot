@@ -72,7 +72,7 @@ test('payment entitlement, access links, validation, revisions and report protec
   assert.equal((await outsider.call(`/api/assessments/${id}`,{method:'DELETE',headers:{'x-csrf-token':ownerCsrf}})).status,403);
   const cleared=await owner.call(`/api/assessments/${id}`,{method:'DELETE',headers:{'x-csrf-token':ownerCsrf}});assert.equal(cleared.status,200);assert.deepEqual(cleared.data.assessment.answers,{});
   const questions=JSON.parse(fs.readFileSync('site/questions.json','utf8')).flatMap(section=>section.questions);
-  const answers=Object.fromEntries(questions.filter(question=>!['q7','q8','q8_registration','q8_prior_permission','q66','q67','q68','q82','q85','q86','q87','q88','q89'].includes(question.id)).map(question=>[question.id,'yes']));
+  const answers=Object.fromEntries(questions.map(question=>[question.id,'yes']));
   const completed=await owner.call(`/api/assessments/${id}`,{method:'PATCH',json:{revision:2,draft:{profile:testProfile(),answers,completed:true}},headers:{'x-csrf-token':ownerCsrf}});assert.equal(completed.status,200);
   assert.equal((await owner.call(`/api/assessments/${id}`,{method:'PATCH',json:{revision:3,draft:{profile:testProfile(),answers}},headers:{'x-csrf-token':ownerCsrf}})).status,409);
   assert.equal((await owner.call(`/api/assessments/${id}/report`)).status,404);

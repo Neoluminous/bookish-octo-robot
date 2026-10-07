@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const sections: Array<{ title: string; questions: Array<{ id: string; prompt: string; label: string }> }> = JSON.parse(fs.readFileSync(path.join(here, 'site/questions.json'), 'utf8'));
 export const questions = sections.flatMap(section => section.questions);
@@ -17,17 +17,7 @@ const profileLimits: Record<string, number> = {
   fundingHistory: 16, fundingSources: 160, seekingCsr: 16, evidenceUrl: 1000,
 };
 
-export function applicable(id: string, profile: Record<string, any>): boolean {
-  if (id === 'q7' && profile.seekingCsr === 'no') return false;
-  if (['q8','q8_registration','q8_prior_permission'].includes(id) && !['international','both'].includes(profile.fundingSources)) return false;
-  if (['q9','q10','q11','q12','q25'].includes(id) && profile.completedFinancialYears === '0') return false;
-  if (['q66', 'q67', 'q68'].includes(id) && profile.websitePresence === 'no') return false;
-  if (id === 'q82' && profile.fundingHistory === 'no') return false;
-  if (['q85', 'q86', 'q87', 'q88', 'q89'].includes(id) && !['international','both'].includes(profile.fundingSources)) return false;
-  if (['q40', 'q41', 'q42', 'q43'].includes(id) && profile.staffing === 'volunteers_only') return false;
-  if (['q46', 'q57'].includes(id) && profile.programmeContext === 'no_direct_contact') return false;
-  return true;
-}
+export function applicable(_id: string, _profile: Record<string, any>): boolean { return true; }
 
 export function validateDraft(draft: any, completing: boolean) {
   const errors: Record<string, string> = {};
@@ -63,7 +53,7 @@ export function validateDraft(draft: any, completing: boolean) {
     else naReasons[key] = value.trim();
   }
   if (completing) {
-    for (const key of ['respondentName', 'ngoName', 'email', 'phoneNumber', 'position', 'entityType', 'registrationYear', 'completedFinancialYears', 'staffing', 'programmeContext', 'websitePresence', 'fundingHistory', 'fundingSources', 'seekingCsr']) {
+    for (const key of ['respondentName', 'ngoName', 'email', 'phoneNumber', 'position']) {
       if (!profile[key]) errors[`profile.${key}`] = 'Required before submission.';
     }
     if (profile.email && !/^\S+@\S+\.\S+$/.test(profile.email)) errors['profile.email'] = 'Enter a valid email.';

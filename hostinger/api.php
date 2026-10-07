@@ -157,7 +157,7 @@ if ($action === 'start') {
         if (validId($existing) && ($record = readJson(assessmentFile($existing)))) jsonResponse(['id'=>$existing,'revision'=>(int) ($record['revision'] ?? 0)]);
         $id = bin2hex(random_bytes(16)); $profile = $payment['profile'] ?? [];
         foreach (is_array($body['profile'] ?? null) ? $body['profile'] : [] as $key => $value) if (is_string($key) && is_string($value)) $profile[$key] = textValue($value, 160);
-        $record = ['id'=>$id,'paymentId'=>$paymentId,'profile'=>$profile,'answers'=>[],'naReasons'=>[],'currentStepId'=>'profile','completed'=>false,'createdAt'=>now(),'updatedAt'=>now(),'revision'=>0,'schemaVersion'=>2];
+        $record = ['id'=>$id,'paymentId'=>$paymentId,'profile'=>$profile,'answers'=>[],'naReasons'=>[],'currentStepId'=>'profile_1','completed'=>false,'createdAt'=>now(),'updatedAt'=>now(),'revision'=>0,'schemaVersion'=>3];
         if (!writeJson(assessmentFile($id), $record)) fail('Unable to start assessment.', 500);
         $payment['assessmentId'] = $id; $payment['updatedAt'] = now();
         if (!writeJson(paymentFile($paymentId), $payment)) { @unlink(assessmentFile($id)); fail('Unable to start assessment.', 500); }
@@ -176,8 +176,8 @@ if ($action === 'save') {
         $input = $body['draft'] ?? null; [$validated, $errors] = validateDraft($input, is_array($input) && ($input['completed'] ?? false) === true);
         if ($errors) fail('Please correct the highlighted fields.', 422, ['fields'=>$errors]);
         $record['profile'] = $validated['profile']; $record['answers'] = $validated['answers']; $record['naReasons'] = $validated['naReasons'];
-        $record['currentStepId'] = textValue($input['currentStepId'] ?? 'profile', 40); $record['completed'] = ($input['completed'] ?? false) === true;
-        $record['revision']++; $record['updatedAt'] = now(); $record['schemaVersion'] = 2;
+        $record['currentStepId'] = textValue($input['currentStepId'] ?? 'profile_1', 40); $record['completed'] = ($input['completed'] ?? false) === true;
+        $record['revision']++; $record['updatedAt'] = now(); $record['schemaVersion'] = 3;
         if (!writeJson($path, $record)) fail('Unable to save progress.', 500);
         $payment = readJson(paymentFile($record['paymentId']));
         if ($payment && $record['completed']) locked('payment-' . $record['paymentId'], function () use ($record) {

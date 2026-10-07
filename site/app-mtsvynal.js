@@ -6,17 +6,9 @@
   const assessmentKey = 'ngo-compass-assessment-v2';
   const paymentKey = 'ngo-compass-payment-reference';
   const profileFields = [
-    ['respondentName','Your name','text'], ['ngoName','Organisation name','text'], ['email','Email address','email'], ['phoneNumber','Phone number','tel'], ['position','Your role','text'],
-    ['entityType','Legal entity type',[['trust','Trust'],['society','Society'],['section8','Section 8 company'],['other','Other'],['unsure','Unsure']]],
-    ['registrationYear','Registration year','number'], ['completedFinancialYears','Completed financial years','number'],
-    ['staffing','Staffing',[['employees','Employees'],['mixed','Employees and volunteers'],['volunteers_only','Volunteers only'],['unsure','Unsure']]],
-    ['programmeContext','Programme context',[['children','Works with children'],['vulnerable_adults','Works with vulnerable adults'],['general_direct_contact','Other direct contact'],['no_direct_contact','No direct participant contact'],['unsure','Unsure']]],
-    ['websitePresence','Website presence',[['yes','Yes'],['no','No'],['unsure','Unsure']]],
-    ['fundingHistory','Previous funding',[['yes','Yes'],['no','No'],['unsure','Unsure']]],
-    ['fundingSources','Intended funding sources',[['domestic','Domestic'],['international','International'],['both','Both'],['unsure','Unsure']]],
-    ['seekingCsr','Seeking CSR funding',[['yes','Yes'],['no','No'],['unsure','Unsure']]],
+    ['respondentName','Your name','text'], ['ngoName','NGO name','text'], ['email','Work email address','email'], ['phoneNumber','Phone number','tel'], ['position','Your position','text'],
   ];
-  const blank = () => ({ profile: Object.fromEntries([...profileFields.map(([key]) => [key,'']), ['evidenceUrl','']]), answers: {}, naReasons: {}, currentStepId: 'profile', completed: false });
+  const blank = () => ({ profile: Object.fromEntries(profileFields.map(([key]) => [key,''])), answers: {}, naReasons: {}, currentStepId: 'profile_1', completed: false });
   let draft = blank(), assessmentId = '', revision = 0, csrf = '', settings = {}, reviewerEmail = '', paymentReference = '';
   let receipt = null, dirty = false, busy = false, conflict = false, saveQueue = Promise.resolve(), saveTimer = 0, saveState = 'Ready to begin', error = '', fieldErrors = {};
   const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
@@ -25,24 +17,15 @@
   const brand = `<a class="assessment-brand" href="${rootPath}"><img src="${rootPath}ngo-compass-logo.png" alt="NGO Compass"></a>`;
   const labels = {yes:'Yes',no:'No',not_applicable:'Not applicable'};
   const idStep = id => {
-    if (id === 'profile' || id === 'context' || id === 'review') return id;
+    if (id === 'profile') return 'profile_1';
+    if (id === 'context') return 'q1';
+    if (/^profile_[1-5]$/.test(id) || id === 'review') return id;
     const previousQuestion = /^q(8|45|53|60|62)_/.exec(id || '');
     const next = previousQuestion ? `q${previousQuestion[1]}` : id;
-    return questions.some(q => q.id === next) ? next : 'profile';
+    return questions.some(q => q.id === next) ? next : 'profile_1';
   };
-  function applicable(id, p) {
-    if (id==='q7' && p.seekingCsr==='no') return false;
-    if (['q8','q8_registration','q8_prior_permission'].includes(id) && !['international','both'].includes(p.fundingSources)) return false;
-    if (['q9','q10','q11','q12','q25'].includes(id) && p.completedFinancialYears==='0') return false;
-    if (['q66','q67','q68'].includes(id) && p.websitePresence === 'no') return false;
-    if (id === 'q82' && p.fundingHistory === 'no') return false;
-    if (['q85','q86','q87','q88','q89'].includes(id) && !['international','both'].includes(p.fundingSources)) return false;
-    if (['q40','q41','q42','q43'].includes(id) && p.staffing === 'volunteers_only') return false;
-    if (['q46','q57'].includes(id) && p.programmeContext === 'no_direct_contact') return false;
-    return true;
-  }
-  const activeQuestions = () => questions.filter(q => applicable(q.id, draft.profile));
-  const steps = () => ['profile','context',...activeQuestions().map(q => q.id),'review'];
+  const activeQuestions = () => questions;
+  const steps = () => [...profileFields.map((_, index) => `profile_${index+1}`),...questions.map(q => q.id),'review'];
   const currentStep = () => idStep(draft.currentStepId);
   function store() { localStorage.setItem(assessmentKey, JSON.stringify({draft, assessmentId, revision, dirty, at:Date.now()})); }
   function mutate(change) { draft = {...draft,...change}; dirty = true; store(); saveState = 'Saving…'; renderAssessment(); scheduleSave(); }
@@ -80,7 +63,7 @@
       } catch(failure) { if (failure.status===403) {location.assign(`${rootPath}payment/`);return;} draft=local.draft||blank(); assessmentId=local.assessmentId; dirty=true; saveState='Save failed. Local answers retained.'; }
     } else if(local?.draft) {draft=local.draft;dirty=true;saveState='Local draft restored.';}
     draft.currentStepId=idStep(draft.currentStepId);
-    if (!steps().includes(draft.currentStepId)) draft.currentStepId='profile';
+    if (!steps().includes(draft.currentStepId)) draft.currentStepId='profile_1';
     if (draft.completed) renderAssessment();
     else if (local?.draft) renderResume();
     else renderAssessment();
@@ -91,26 +74,35 @@
   }
   function field(key,label,type) {
     const value=esc(draft.profile[key]||''); const invalid=fieldErrors[`profile.${key}`] ? ' aria-invalid="true"' : '';
-    const control=Array.isArray(type) ? `<select data-profile="${key}"${invalid}><option value="">Choose…</option>${type.map(([v,t])=>`<option value="${v}" ${draft.profile[key]===v?'selected':''}>${esc(t)}</option>`).join('')}</select>` : `<input data-profile="${key}" type="${type}" value="${value}" maxlength="${key==='registrationYear'?4:key==='completedFinancialYears'?2:160}"${invalid}>`;
+    const placeholder=key==='position' ? ' placeholder="e.g., Founder, Director, Programme Manager"' : '';
+    const control=`<input data-profile="${key}" type="${type}" value="${value}" maxlength="160"${placeholder}${invalid}>`;
     return `<label class="field-label">${esc(label)}${control}${fieldErrors[`profile.${key}`]?`<span class="form-error">${esc(fieldErrors[`profile.${key}`])}</span>`:''}</label>`;
   }
+  function profilePrompt(index) {
+    return [
+      'What is your name?',
+      `Hi, ${draft.profile.respondentName?.trim() || 'there'} 👋 What is your NGO’s name?`,
+      'What is your work email address?',
+      'What is your phone number?',
+      `What is your position at ${draft.profile.ngoName?.trim() || 'your NGO'}?`,
+    ][index];
+  }
   function renderAssessment() {
-    const active=activeQuestions(), ids=steps(); if (!ids.includes(draft.currentStepId)) draft.currentStepId='review'; const step=currentStep(), index=ids.indexOf(step), question=questions.find(q=>q.id===step);
+    const active=activeQuestions(), ids=steps(); if (!ids.includes(draft.currentStepId)) draft.currentStepId='profile_1'; const step=currentStep(), index=ids.indexOf(step), question=questions.find(q=>q.id===step);
+    const profileIndex=/^profile_[1-5]$/.test(step) ? Number(step.slice(-1))-1 : -1;
     const progress=Math.round((index/(ids.length-1))*100);
     let content='';
     if (draft.completed) content=`<div class="thank-you-card"><h1>Assessment submitted</h1><p>Reference: <strong>${esc(receipt?.reference||'Ask support for your reference')}</strong></p><p>Submitted: ${esc(receipt?.submittedAt||draft.updatedAt||'')}</p><p>Review state: ${esc((receipt?.reviewStatus||'submitted').replaceAll('_',' '))}</p>${receipt?.reviewerScore!==null&&receipt?.reviewerScore!==undefined?`<p>Reviewer-entered score: ${esc(receipt.reviewerScore)} / 100</p>`:''}<p>A reviewer will review your answers. Your PDF report will appear here when it is ready. Contact support for help with access.</p>${receipt?.reportReady?`<a class="continue-button" href="${rootPath}api/assessments/${assessmentId}/report">Download reviewed PDF report</a>`:''}<button type="button" data-refresh>Refresh review status</button></div>`;
-    else if(step==='profile') content=`<h1>About you and your organisation</h1><p class="assessment-helper">Work at your own pace. Gathering documents can take additional time.</p>${profileFields.slice(0,5).map(([k,l,t])=>field(k,l,t)).join('')}`;
-    else if(step==='context') content=`<h1>Organisation context</h1><p class="assessment-helper">These details determine which questions apply. Legal applicability requires reviewer confirmation.</p>${profileFields.slice(5).map(([k,l,t])=>field(k,l,t)).join('')}<p class="assessment-helper">${reviewerEmail?`Optional evidence link: restrict access to ${esc(reviewerEmail)}. Redact unnecessary personal and banking details.`:'Evidence can be arranged later with an authorised reviewer. Sharing is optional for drafts.'}</p>${field('evidenceUrl','Restricted evidence link (optional)','url')}`;
+    else if(profileIndex>=0) {const [key,label,type]=profileFields[profileIndex];content=`<p class="eyebrow">About your NGO · Question ${profileIndex+1} of 5</p><h1>${esc(profilePrompt(profileIndex))}</h1><p class="assessment-helper">Work at your own pace. Your answers are saved as you go.</p>${field(key,label,type)}`;}
     else if(question) content=`<p class="eyebrow">${esc(question.group)} · ${esc(question.id)}</p><h1 tabindex="-1" data-heading>${esc(question.prompt)}</h1><p class="assessment-helper">Yes: available and used. No: absent. Not applicable: explain why. A combined document may support multiple questions.</p>${draft.answers[question.id]==='not_sure'?'<p class="form-error">Please update your previous answer before continuing.</p>':''}<div class="answer-buttons" role="group" aria-label="Answer">${Object.entries(labels).map(([value,label])=>`<button type="button" class="answer-button ${value} ${draft.answers[question.id]===value?'selected':''}" data-answer="${value}" aria-pressed="${draft.answers[question.id]===value}">${label}</button>`).join('')}</div>${draft.answers[question.id]==='not_applicable'?`<label class="field-label">Why does this not apply?<textarea data-reason="${question.id}" maxlength="500">${esc(draft.naReasons[question.id]||'')}</textarea></label>`:''}${fieldErrors[`answers.${question.id}`]?`<p class="form-error">${esc(fieldErrors[`answers.${question.id}`])}</p>`:''}${fieldErrors[`naReasons.${question.id}`]?`<p class="form-error">${esc(fieldErrors[`naReasons.${question.id}`])}</p>`:''}`;
     else content=`<h1>Review your answers</h1><p class="assessment-helper">Check every applicable answer. Use Edit to return directly to a question.</p><div class="review-summary">${active.map(q=>`<div class="answer"><span>${esc(q.id)} · ${esc(q.label)}</span><strong>${esc(labels[draft.answers[q.id]]||(draft.answers[q.id]==='not_sure'?'Needs update':'Missing'))}</strong><button type="button" data-go="${q.id}">Edit</button></div>`).join('')}</div>`;
     replace(`<main class="assessment-page"><section class="assessment-shell"><div class="assessment-topbar">${brand}<span class="save-state" role="status" aria-live="polite">${esc(saveState)}</span></div>${conflict?`<div class="form-error" role="alert">This draft differs from the server. <button type="button" data-keep-local>Keep my answers</button> <button type="button" data-use-server>Use server version</button></div>`:''}${draft.completed?content:`<div class="assessment-progress" role="progressbar" aria-label="Assessment progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><span style="width:${progress}%"></span></div><p class="assessment-stage">${esc(question?.group||'About your NGO')}</p><div class="assessment-content">${content}${error?`<p class="form-error" role="alert">${esc(error)}</p>`:''}<div class="assessment-actions">${index>0?'<button type="button" class="back-button" data-back>Back</button>':''}<button type="button" class="continue-button" data-next ${busy||conflict?'disabled':''}>${step==='review'?'Submit assessment':'Continue'}</button><button type="button" class="back-button" data-clear>Clear draft</button></div><p class="assessment-helper">Sensitive evidence is optional now. Provide restricted access only to an authorised reviewer.</p></div>`}</section></main>`);
     if(question) document.querySelector('[data-heading]')?.focus();
   }
   function validateStep() {
-    const step=currentStep(), required=step==='profile'?profileFields.slice(0,5):step==='context'?profileFields.slice(5):[];
-    for(const [key,label] of required) if(!draft.profile[key]?.trim()) return `Complete ${label.toLowerCase()}.`;
-    if(step==='profile'&&!/^\S+@\S+\.\S+$/.test(draft.profile.email)) return 'Enter a valid email address.';
-    if(step==='context'&&draft.profile.evidenceUrl&&!/^https:\/\/[A-Za-z0-9.-]+(?:\/|$)/.test(draft.profile.evidenceUrl)) return 'Use a secure HTTPS evidence link.';
+    const step=currentStep(), profileIndex=/^profile_[1-5]$/.test(step) ? Number(step.slice(-1))-1 : -1;
+    if(profileIndex>=0) {const [key,label]=profileFields[profileIndex];if(!draft.profile[key]?.trim()) return `Complete ${label.toLowerCase()}.`;}
+    if(step==='profile_3'&&!/^\S+@\S+\.\S+$/.test(draft.profile.email)) return 'Enter a valid email address.';
     if(/^q\d+(?:_[a-z]+)?$/.test(step)) {if(!labels[draft.answers[step]]) return 'Choose an answer.'; if(draft.answers[step]==='not_applicable'&&!draft.naReasons[step]?.trim()) return 'Explain why this does not apply.';}
     return '';
   }

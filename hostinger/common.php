@@ -108,13 +108,6 @@ function questions(): array {
     return $all;
 }
 function applies(string $id, array $p): bool {
-    if ($id === 'q7' && ($p['seekingCsr'] ?? '') === 'no') return false;
-    if (in_array($id, ['q8','q8_registration','q8_prior_permission','q85','q86','q87','q88','q89'], true) && !in_array($p['fundingSources'] ?? '', ['international','both'], true)) return false;
-    if (in_array($id, ['q9','q10','q11','q12','q25'], true) && ($p['completedFinancialYears'] ?? '') === '0') return false;
-    if (in_array($id, ['q66','q67','q68'], true) && ($p['websitePresence'] ?? '') === 'no') return false;
-    if ($id === 'q82' && ($p['fundingHistory'] ?? '') === 'no') return false;
-    if (in_array($id, ['q40','q41','q42','q43'], true) && ($p['staffing'] ?? '') === 'volunteers_only') return false;
-    if (in_array($id, ['q46','q57'], true) && ($p['programmeContext'] ?? '') === 'no_direct_contact') return false;
     return true;
 }
 function validateDraft(mixed $draft, bool $complete): array {
@@ -139,7 +132,7 @@ function validateDraft(mixed $draft, bool $complete): array {
     foreach ($options as $key => $allowed) if (isset($profile[$key]) && $profile[$key] !== '' && !in_array($profile[$key], $allowed, true)) $errors['profile.' . $key] = 'Choose a valid option.';
     if (($profile['evidenceUrl'] ?? '') !== '' && !preg_match('#^https://[A-Za-z0-9.-]+(?:/|$)#', $profile['evidenceUrl'])) $errors['profile.evidenceUrl'] = 'Enter a secure HTTPS link.';
     if ($complete) {
-        foreach (array_keys($limits) as $key) if ($key !== 'evidenceUrl' && ($profile[$key] ?? '') === '') $errors['profile.' . $key] = 'Required before submission.';
+        foreach (['respondentName','ngoName','email','phoneNumber','position'] as $key) if (($profile[$key] ?? '') === '') $errors['profile.' . $key] = 'Required before submission.';
         if (($profile['email'] ?? '') !== '' && filter_var($profile['email'], FILTER_VALIDATE_EMAIL) === false) $errors['profile.email'] = 'Enter a valid email.';
         if (($profile['registrationYear'] ?? '') !== '' && !preg_match('/^(19|20)\d{2}$/D', $profile['registrationYear'])) $errors['profile.registrationYear'] = 'Enter a four-digit year.';
         if (($profile['completedFinancialYears'] ?? '') !== '' && !preg_match('/^\d{1,2}$/D', $profile['completedFinancialYears'])) $errors['profile.completedFinancialYears'] = 'Enter a number.';

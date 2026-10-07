@@ -533,6 +533,7 @@ function handleApiPost(req: Request, res: Response) {
       answers: {},
       naReasons: {},
       currentStep: 0,
+      currentStepId: 'profile_1',
       completed: false,
       createdAt: now,
       updatedAt: now,
