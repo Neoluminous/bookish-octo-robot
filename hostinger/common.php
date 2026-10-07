@@ -144,7 +144,7 @@ function validateDraft(mixed $draft, bool $complete): array {
         if (($profile['registrationYear'] ?? '') !== '' && !preg_match('/^(19|20)\d{2}$/D', $profile['registrationYear'])) $errors['profile.registrationYear'] = 'Enter a four-digit year.';
         if (($profile['completedFinancialYears'] ?? '') !== '' && !preg_match('/^\d{1,2}$/D', $profile['completedFinancialYears'])) $errors['profile.completedFinancialYears'] = 'Enter a number.';
         foreach ($known as $id => $question) if (applies($id, $profile)) {
-            if (!isset($answers[$id])) $errors['answers.' . $id] = 'Choose an answer.';
+            if (!isset($answers[$id]) || $answers[$id] === 'not_sure') $errors['answers.' . $id] = 'Choose an answer.';
             elseif ($answers[$id] === 'not_applicable' && ($reasons[$id] ?? '') === '') $errors['naReasons.' . $id] = 'Explain why this is not applicable.';
         }
     }

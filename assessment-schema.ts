@@ -70,7 +70,7 @@ export function validateDraft(draft: any, completing: boolean) {
     if (profile.registrationYear && !/^(19|20)\d{2}$/.test(profile.registrationYear)) errors['profile.registrationYear'] = 'Enter a four-digit year.';
     if (profile.completedFinancialYears && !/^\d{1,2}$/.test(profile.completedFinancialYears)) errors['profile.completedFinancialYears'] = 'Enter a number.';
     for (const question of questions) {
-      if (applicable(question.id, profile) && !answers[question.id]) errors[`answers.${question.id}`] = 'Choose an answer.';
+      if (applicable(question.id, profile) && (!answers[question.id] || answers[question.id] === 'not_sure')) errors[`answers.${question.id}`] = 'Choose an answer.';
       if (applicable(question.id, profile) && answers[question.id] === 'not_applicable' && !naReasons[question.id]) errors[`naReasons.${question.id}`] = 'Explain why this is not applicable.';
     }
   }
