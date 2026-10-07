@@ -41,34 +41,27 @@
         border-radius: 13px;
         padding: 0 21px;
         font-weight: 740;
-        color: #ffffff !important;
-        border: 1px solid transparent;
+        color: #183b2a !important;
+        border: 2px solid #b7cfc0 !important;
         min-width: 136px;
-        box-shadow: 0 9px 18px rgba(6, 44, 28, 0.16);
+        box-shadow: none;
         transition: transform 0.16s, box-shadow 0.16s, background 0.16s;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: #33423a;
+        background: #f7faf8 !important;
       }
-      .answer-button.yes { background: linear-gradient(135deg, #0a7546, #075a35) !important; border-color: #075a35 !important; }
-      .answer-button.no { background: #33423a !important; border-color: #29372f !important; }
-      .answer-button.not_applicable,
-      .answer-button.not-applicable,
-      .answer-button.not.applicable {
-        background: #4a5750 !important;
-        border-color: #3b4741 !important;
-        color: #ffffff !important;
-      }
-      .answer-button.not_applicable:hover,
-      .answer-button.not-applicable:hover {
-        background: #3c4842 !important;
-      }
+      .answer-button:hover { background: #eaf3ed !important; border-color: #0a7546 !important; }
       .answer-button.selected {
+        color: #fff !important;
+        background: #0b5d37 !important;
+        border-color: #064528 !important;
         outline-offset: 3px;
         outline: 3px solid #b7e8c6;
         box-shadow: 0 0 0 5px rgba(18, 107, 66, 0.2), 0 14px 24px rgba(6, 44, 28, 0.24);
       }
+      .answer-button.selected:hover { background: #084b2d !important; }
+      .answer-check { margin-right: 8px; font-size: 19px; line-height: 1; }
       .q-badge-wrap {
         margin: 0 0 14px 0;
         display: flex;
@@ -171,6 +164,10 @@
       .section-nav button:focus-visible, .answer-button:focus-visible { outline: 3px solid #e2a827; outline-offset: 2px; }
       .assessment-content .field-label { display: block; margin: 12px 0; }
       .assessment-content .field-label input, .assessment-content .field-label select, .assessment-content .field-label textarea { display: block; width: 100%; margin-top: 6px; }
+      .question-helper { margin-bottom: 16px; }
+      .draft-actions { display: flex; justify-content: flex-end; margin-top: 18px; }
+      .clear-draft-link { color: #52685a; background: none; border: 0; padding: 8px 0; font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
+      .clear-draft-link:focus-visible { outline: 3px solid #e2a827; outline-offset: 3px; }
       .na-reason-input { display: block; width: 100%; min-height: 120px; margin-top: 18px; padding: 14px 16px; color: #19372a; font: inherit; line-height: 1.5; background: #fff; border: 2px solid #9bbba7; border-radius: 12px; resize: vertical; }
       .na-reason-input::placeholder { color: #5f6f65; opacity: 1; }
       .na-reason-input:focus-visible { border-color: #0a7546; outline: 3px solid #b7e8c6; outline-offset: 2px; }
@@ -180,6 +177,13 @@
         .admin-nav-link { padding: 6px 11px; font-size: 12px; }
         .answer-buttons { margin-left: 0; width: 100%; flex-direction: column; }
         .answer-button { width: 100%; min-width: 0; }
+        .assessment-content.question-content { padding-top: 24px; }
+        .assessment-question-title { font-size: clamp(2rem, 8vw, 2.5rem) !important; line-height: 1.04 !important; margin-bottom: 14px !important; }
+        .question-helper { font-size: 15px; line-height: 1.4; margin-bottom: 18px; }
+        .assessment-actions { flex-direction: column; margin-top: 28px; }
+        .assessment-actions .continue-button { order: 1; width: 100%; }
+        .assessment-actions .back-button { order: 2; width: 100%; }
+        .draft-actions { margin-top: 20px; }
         .drive-checklist { padding: 16px; }
         .section-nav nav { grid-template-columns: 1fr; }
       }
@@ -205,5 +209,5 @@
       <section class="roadmap-section" data-reveal><div class="roadmap-copy"><h2>Turn gaps into a clear funding roadmap</h2><p>Understand what may be holding your NGO back, what different funders look for and which improvements to prioritise before applying.</p></div><div class="roadmap-offer"><div><span class="offer-price">₹1,999</span><span class="offer-note">Expert-reviewed assessment and practical PDF report</span></div><a class="primary-cta light" href="./payment/">Check Your Funding Readiness <span aria-hidden="true">→</span></a></div></section>
       <footer data-reveal><img src="./ngo-compass-logo.png" alt="NGO Compass" width="1921" height="416" loading="lazy"><p>Clearer documentation. Stronger applications. More confident fundraising. <a href="./privacy/">Privacy note</a> · <a href="./admin">Admin Login</a></p></footer>
     </main>
-  <script src="./questions-mtsvynal.js?v=20261007c" defer></script><script src="./qrcode-mtsvynal.js" defer></script><script src="./app-mtsvynal.js?v=20261007g" defer></script></body>
+  <script src="./questions-mtsvynal.js?v=20261007c" defer></script><script src="./qrcode-mtsvynal.js" defer></script><script src="./app-mtsvynal.js?v=20261007h" defer></script></body>
 </html>
