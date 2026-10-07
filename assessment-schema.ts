@@ -7,6 +7,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 export const sections: Array<{ title: string; questions: Array<{ id: string; prompt: string; label: string }> }> = JSON.parse(fs.readFileSync(path.join(here, 'site/questions.json'), 'utf8'));
 export const questions = sections.flatMap(section => section.questions);
 const ids = new Set(questions.map(question => question.id));
+// Keep answers from in-progress assessments created before the 89-question form.
+const retiredIds = new Set(['q8_registration','q8_prior_permission','q45_committee','q45_process','q53_stories','q53_photos','q53_data','q60_mfa','q62_restore']);
 const choices = new Set(['yes', 'no', 'not_sure', 'not_applicable']);
 const profileLimits: Record<string, number> = {
   respondentName: 120, ngoName: 160, email: 160, phoneNumber: 40, position: 120,
@@ -52,12 +54,12 @@ export function validateDraft(draft: any, completing: boolean) {
   if (profile.evidenceUrl && !/^https:\/\/[A-Za-z0-9.-]+(?:\/|$)/.test(profile.evidenceUrl)) errors['profile.evidenceUrl'] = 'Enter a secure HTTPS link.';
   const answers: Record<string, string> = {};
   for (const [key, value] of Object.entries(inputAnswers || {})) {
-    if (!ids.has(key) || typeof value !== 'string' || !choices.has(value)) errors[`answers.${key}`] = 'Invalid answer.';
+    if ((!ids.has(key) && !retiredIds.has(key)) || typeof value !== 'string' || !choices.has(value)) errors[`answers.${key}`] = 'Invalid answer.';
     else answers[key] = value;
   }
   const naReasons: Record<string, string> = {};
   for (const [key, value] of Object.entries(inputReasons || {})) {
-    if (!ids.has(key) || typeof value !== 'string' || value.length > 500) errors[`naReasons.${key}`] = 'Invalid reason.';
+    if ((!ids.has(key) && !retiredIds.has(key)) || typeof value !== 'string' || value.length > 500) errors[`naReasons.${key}`] = 'Invalid reason.';
     else naReasons[key] = value.trim();
   }
   if (completing) {

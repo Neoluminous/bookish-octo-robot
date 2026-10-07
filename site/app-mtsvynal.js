@@ -2,7 +2,6 @@
   const rootPath = new URL(document.querySelector('base')?.href || '/FundingReady/', location.href).pathname;
   const api = `${rootPath}api.php`;
   const questions = window.NGO_COMPASS_QUESTIONS || [];
-  const sections = [...new Set(questions.map(q => q.group))];
   const support = 'https://wa.me/919879547984?text=Hi%2C%20I%20need%20help%20with%20my%20Funding%20Ready%20assessment.';
   const assessmentKey = 'ngo-compass-assessment-v2';
   const paymentKey = 'ngo-compass-payment-reference';
@@ -25,7 +24,12 @@
   const replace = html => { main().outerHTML = html; };
   const brand = `<a class="assessment-brand" href="${rootPath}"><img src="${rootPath}ngo-compass-logo.png" alt="NGO Compass"></a>`;
   const labels = {yes:'Yes',no:'No',not_sure:'Unsure',not_applicable:'Not applicable'};
-  const idStep = id => id === 'profile' || id === 'context' || id === 'review' ? id : questions.some(q => q.id === id) ? id : 'profile';
+  const idStep = id => {
+    if (id === 'profile' || id === 'context' || id === 'review') return id;
+    const previousQuestion = /^q(8|45|53|60|62)_/.exec(id || '');
+    const next = previousQuestion ? `q${previousQuestion[1]}` : id;
+    return questions.some(q => q.id === next) ? next : 'profile';
+  };
   function applicable(id, p) {
     if (id==='q7' && p.seekingCsr==='no') return false;
     if (['q8','q8_registration','q8_prior_permission'].includes(id) && !['international','both'].includes(p.fundingSources)) return false;
@@ -75,7 +79,15 @@
         else {draft=remoteDraft;dirty=false;saveState=draft.completed?'Submitted':'Saved';store();}
       } catch(failure) { if (failure.status===403) {location.assign(`${rootPath}payment/`);return;} draft=local.draft||blank(); assessmentId=local.assessmentId; dirty=true; saveState='Save failed. Local answers retained.'; }
     } else if(local?.draft) {draft=local.draft;dirty=true;saveState='Local draft restored.';}
-    draft.currentStepId=idStep(draft.currentStepId); renderAssessment(); if(dirty&&!conflict) scheduleSave();
+    draft.currentStepId=idStep(draft.currentStepId);
+    if (!steps().includes(draft.currentStepId)) draft.currentStepId='profile';
+    if (draft.completed) renderAssessment();
+    else if (local?.draft) renderResume();
+    else renderAssessment();
+    if(dirty&&!conflict) scheduleSave();
+  }
+  function renderResume() {
+    replace(`<main class="assessment-page"><section class="assessment-shell"><div class="assessment-topbar">${brand}<span class="save-state" role="status" aria-live="polite">${esc(saveState)}</span></div><div class="assessment-content"><h1>Resume your assessment</h1><p class="assessment-helper">Your unfinished answers are saved. Continue where you left off.</p><button type="button" class="continue-button" data-resume>Resume assessment</button></div></section></main>`);
   }
   function field(key,label,type) {
     const value=esc(draft.profile[key]||''); const invalid=fieldErrors[`profile.${key}`] ? ' aria-invalid="true"' : '';
@@ -85,14 +97,13 @@
   function renderAssessment() {
     const active=activeQuestions(), ids=steps(); if (!ids.includes(draft.currentStepId)) draft.currentStepId='review'; const step=currentStep(), index=ids.indexOf(step), question=questions.find(q=>q.id===step);
     const progress=Math.round((index/(ids.length-1))*100);
-    const nav=`<button type="button" data-go="profile">About your NGO</button><button type="button" data-go="context">Organisation context</button>`+sections.map(name=>{const first=active.find(q=>q.group===name);return first?`<button type="button" data-go="${first.id}">${esc(name)}</button>`:'';}).join('');
     let content='';
     if (draft.completed) content=`<div class="thank-you-card"><h1>Assessment submitted</h1><p>Reference: <strong>${esc(receipt?.reference||'Ask support for your reference')}</strong></p><p>Submitted: ${esc(receipt?.submittedAt||draft.updatedAt||'')}</p><p>Review state: ${esc((receipt?.reviewStatus||'submitted').replaceAll('_',' '))}</p>${receipt?.reviewerScore!==null&&receipt?.reviewerScore!==undefined?`<p>Reviewer-entered score: ${esc(receipt.reviewerScore)} / 100</p>`:''}<p>A reviewer will review your answers. Your PDF report will appear here when it is ready. Contact support for help with access.</p>${receipt?.reportReady?`<a class="continue-button" href="${rootPath}api/assessments/${assessmentId}/report">Download reviewed PDF report</a>`:''}<button type="button" data-refresh>Refresh review status</button></div>`;
     else if(step==='profile') content=`<h1>About you and your organisation</h1><p class="assessment-helper">Work at your own pace. Gathering documents can take additional time.</p>${profileFields.slice(0,5).map(([k,l,t])=>field(k,l,t)).join('')}`;
     else if(step==='context') content=`<h1>Organisation context</h1><p class="assessment-helper">These details determine which questions apply. Legal applicability requires reviewer confirmation.</p>${profileFields.slice(5).map(([k,l,t])=>field(k,l,t)).join('')}<p class="assessment-helper">${reviewerEmail?`Optional evidence link: restrict access to ${esc(reviewerEmail)}. Redact unnecessary personal and banking details.`:'Evidence can be arranged later with an authorised reviewer. Sharing is optional for drafts.'}</p>${field('evidenceUrl','Restricted evidence link (optional)','url')}`;
     else if(question) content=`<p class="eyebrow">${esc(question.group)} · ${esc(question.id)}</p><h1 tabindex="-1" data-heading>${esc(question.prompt)}</h1><p class="assessment-helper">Yes: available and used. No: absent. Unsure: check needed. Not applicable: explain why. A combined document may support multiple questions.</p><div class="answer-buttons" role="group" aria-label="Answer">${Object.entries(labels).map(([value,label])=>`<button type="button" class="answer-button ${value} ${draft.answers[question.id]===value?'selected':''}" data-answer="${value}" aria-pressed="${draft.answers[question.id]===value}">${label}</button>`).join('')}</div>${draft.answers[question.id]==='not_applicable'?`<label class="field-label">Why does this not apply?<textarea data-reason="${question.id}" maxlength="500">${esc(draft.naReasons[question.id]||'')}</textarea></label>`:''}${fieldErrors[`answers.${question.id}`]?`<p class="form-error">${esc(fieldErrors[`answers.${question.id}`])}</p>`:''}${fieldErrors[`naReasons.${question.id}`]?`<p class="form-error">${esc(fieldErrors[`naReasons.${question.id}`])}</p>`:''}`;
     else content=`<h1>Review your answers</h1><p class="assessment-helper">Check every applicable answer. Use Edit to return directly to a question.</p><div class="review-summary">${active.map(q=>`<div class="answer"><span>${esc(q.id)} · ${esc(q.label)}</span><strong>${esc(labels[draft.answers[q.id]]||'Missing')}</strong><button type="button" data-go="${q.id}">Edit</button></div>`).join('')}</div>`;
-    replace(`<main class="assessment-page"><section class="assessment-shell"><div class="assessment-topbar">${brand}<span class="save-state" role="status" aria-live="polite">${esc(saveState)}</span></div>${conflict?`<div class="form-error" role="alert">This draft differs from the server. <button type="button" data-keep-local>Keep my answers</button> <button type="button" data-use-server>Use server version</button></div>`:''}${draft.completed?content:`<div class="assessment-progress" role="progressbar" aria-label="Assessment progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><span style="width:${progress}%"></span></div><p class="assessment-stage">${esc(question?.group||'About your NGO')}</p><div class="assessment-content">${content}${error?`<p class="form-error" role="alert">${esc(error)}</p>`:''}<details class="section-nav"><summary>Jump to section</summary><nav aria-label="Assessment sections">${nav}</nav></details><div class="assessment-actions">${index>0?'<button type="button" class="back-button" data-back>Back</button>':''}<button type="button" class="continue-button" data-next ${busy||conflict?'disabled':''}>${step==='review'?'Submit assessment':'Continue'}</button><button type="button" class="back-button" data-clear>Clear draft</button></div><p class="assessment-helper">Sensitive evidence is optional now. Provide restricted access only to an authorised reviewer.</p></div>`}</section></main>`);
+    replace(`<main class="assessment-page"><section class="assessment-shell"><div class="assessment-topbar">${brand}<span class="save-state" role="status" aria-live="polite">${esc(saveState)}</span></div>${conflict?`<div class="form-error" role="alert">This draft differs from the server. <button type="button" data-keep-local>Keep my answers</button> <button type="button" data-use-server>Use server version</button></div>`:''}${draft.completed?content:`<div class="assessment-progress" role="progressbar" aria-label="Assessment progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><span style="width:${progress}%"></span></div><p class="assessment-stage">${esc(question?.group||'About your NGO')}</p><div class="assessment-content">${content}${error?`<p class="form-error" role="alert">${esc(error)}</p>`:''}<div class="assessment-actions">${index>0?'<button type="button" class="back-button" data-back>Back</button>':''}<button type="button" class="continue-button" data-next ${busy||conflict?'disabled':''}>${step==='review'?'Submit assessment':'Continue'}</button><button type="button" class="back-button" data-clear>Clear draft</button></div><p class="assessment-helper">Sensitive evidence is optional now. Provide restricted access only to an authorised reviewer.</p></div>`}</section></main>`);
     if(question) document.querySelector('[data-heading]')?.focus();
   }
   function validateStep() {
@@ -162,6 +173,7 @@
   }
   document.addEventListener('click', event => {
     const button=event.target.closest('button');if(!button)return;
+    if(button.matches('[data-resume]')){renderAssessment();return;}
     if(button.matches('[data-next]')){void advance();return;}if(button.matches('[data-back]')){const list=steps(),at=list.indexOf(currentStep());draft.currentStepId=list[Math.max(0,at-1)];dirty=true;store();renderAssessment();return;}
     if(button.matches('[data-clear]')){void clearDraft();return;}if(button.matches('[data-go]')){draft.currentStepId=button.dataset.go;dirty=true;store();renderAssessment();return;}
     if(button.matches('[data-answer]')){draft.answers[button.closest('[data-question]')?.dataset.question||currentStep()]=button.dataset.answer;dirty=true;store();renderAssessment();scheduleSave();return;}

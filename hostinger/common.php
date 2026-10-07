@@ -126,12 +126,13 @@ function validateDraft(mixed $draft, bool $complete): array {
         else $profile[$key] = trim($value);
     }
     $choices = ['yes','no','not_sure','not_applicable']; $known = questions();
+    $retired = array_fill_keys(['q8_registration','q8_prior_permission','q45_committee','q45_process','q53_stories','q53_photos','q53_data','q60_mfa','q62_restore'], true);
     foreach ($draft['answers'] as $key => $value) {
-        if (!isset($known[$key]) || !in_array($value, $choices, true)) $errors['answers.' . $key] = 'Invalid answer.';
+        if ((!isset($known[$key]) && !isset($retired[$key])) || !in_array($value, $choices, true)) $errors['answers.' . $key] = 'Invalid answer.';
         else $answers[$key] = $value;
     }
     foreach ($draft['naReasons'] as $key => $value) {
-        if (!isset($known[$key]) || !is_string($value) || mb_strlen($value) > 500) $errors['naReasons.' . $key] = 'Invalid reason.';
+        if ((!isset($known[$key]) && !isset($retired[$key])) || !is_string($value) || mb_strlen($value) > 500) $errors['naReasons.' . $key] = 'Invalid reason.';
         else $reasons[$key] = trim($value);
     }
     $options = ['entityType'=>['trust','society','section8','other','unsure'],'staffing'=>['employees','mixed','volunteers_only','unsure'],'programmeContext'=>['children','vulnerable_adults','general_direct_contact','no_direct_contact','unsure'],'websitePresence'=>['yes','no','unsure'],'fundingHistory'=>['yes','no','unsure'],'fundingSources'=>['domestic','international','both','unsure'],'seekingCsr'=>['yes','no','unsure']];
